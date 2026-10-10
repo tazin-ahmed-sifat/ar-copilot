@@ -1,8 +1,15 @@
 """Scan a publication allowlist without printing any secret values."""
+import sys
+from pathlib import Path
+
+if not __package__:
+    # Run as `python scripts/<name>.py`: put the repo root on the path so
+    # `ar_copilot` imports the same way it does under `python -m scripts.<name>`.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import json
 import re
 import subprocess
-from pathlib import Path
 from ar_copilot.config import ROOT, gemini_settings
 
 PUBLIC_DIRECTORIES = ['ar_copilot', 'tests', 'scripts', 'docs', '.vscode', '.streamlit']

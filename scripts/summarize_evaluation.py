@@ -1,7 +1,14 @@
 """Summarize an existing measured report; never calls Gemini or writes SQLite."""
+import sys
+from pathlib import Path
+
+if not __package__:
+    # Run as `python scripts/<name>.py`: put the repo root on the path so
+    # `ar_copilot` imports the same way it does under `python -m scripts.<name>`.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import argparse
 import json
-from pathlib import Path
 from ar_copilot.core import FIELDS
 
 def summarize(report, anomalies):

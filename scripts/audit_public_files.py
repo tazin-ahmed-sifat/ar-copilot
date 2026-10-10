@@ -12,7 +12,7 @@ import re
 import subprocess
 from ar_copilot.config import ROOT, gemini_settings
 
-PUBLIC_DIRECTORIES = ['ar_copilot', 'tests', 'scripts', 'docs', '.vscode', '.streamlit']
+PUBLIC_DIRECTORIES = ['ar_copilot', 'tests', 'scripts', 'docs', 'results', '.vscode', '.streamlit']
 PUBLIC_FILES = ['app.py', 'README.md', 'requirements.txt', 'requirements.lock.txt', '.gitignore', '.env.example']
 
 def audit():

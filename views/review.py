@@ -36,7 +36,7 @@ def _checks_label(record: dict) -> str:
 
 def choose_document(visible: list[dict], rows: list[int]) -> dict:
     """The row clicked in the table wins; otherwise keep the last choice if it's still listed."""
-    if rows and rows[0] < len(visible):
+    if rows and 0 <= rows[0] < len(visible):
         st.session_state['selected_document'] = visible[rows[0]]['id']
     wanted = st.session_state.get('selected_document')
     return next((r for r in visible if r['id'] == wanted), visible[0])
@@ -140,11 +140,11 @@ if not visible:
     st.stop()
 
 table_key = f'queue-{choice}-{st.session_state.get("queue_version", 0)}'
-queue = st.dataframe(queue_table(visible), key=table_key, on_select='rerun', selection_mode='single-row', hide_index=True,
+queue = st.dataframe(queue_table(visible), key=table_key, on_select='rerun', selection_mode='single-cell', hide_index=True,
              height=min(38 + 35 * len(visible), 300), width='stretch',
              column_config={'Total': st.column_config.NumberColumn(format='£%.2f')})
 
-record = choose_document(visible, queue.selection.rows)
+record = choose_document(visible, [cell[0] for cell in queue.selection.cells])
 extraction = json.loads(record['extraction'])
 heading_with_status(record.get('document_number') or record['filename'], record['status'])
 source = 'offline fixtures' if extraction['mode'] == 'demo' else f"Gemini ({extraction.get('model') or 'model unknown'})"

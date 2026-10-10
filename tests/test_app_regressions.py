@@ -133,3 +133,25 @@ def test_missing_demo_and_bad_payment_are_errors(isolated_app, monkeypatch):
     serve_ledger(monkeypatch, b'payment_id,invoice_number,customer,payment_date,amount\nP1,NC-0001,Alder Motors Ltd,2026-10-01,oops\n')
     app.run(); button(app,'Import payments').click().run()
     assert not app.exception and app.error and not store.payments()
+
+
+@pytest.mark.parametrize('column', ['Document', 'Customer', 'Total', 'Due', 'Checks', 'Status'])
+def test_queue_cell_click_opens_its_document(isolated_app, monkeypatch, column):
+    from types import SimpleNamespace
+
+    app, store, _ = isolated_app
+    app.run()
+    button(app, 'Load 40 offline demo documents').click().run()
+    native_dataframe = st.dataframe
+
+    def selected_cell(data, *args, **kwargs):
+        if str(kwargs.get('key', '')).startswith('queue-'):
+            assert kwargs['selection_mode'] == 'single-cell'
+            return SimpleNamespace(selection=SimpleNamespace(cells=[(2, column)]))
+        return native_dataframe(data, *args, **kwargs)
+
+    monkeypatch.setattr(st, 'dataframe', selected_cell)
+    app.run()
+    assert not app.exception
+    assert app.session_state['selected_document'] == store.documents()[2]['id']
+    assert text_input(app, 'Document number').value == store.documents()[2]['document_number']

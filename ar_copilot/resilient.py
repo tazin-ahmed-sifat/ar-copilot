@@ -1,6 +1,6 @@
-"""Paced Gemini evaluation that checkpoints after every step and can resume failed documents.
+"""Sequential Ollama evaluation that checkpoints after every step and can resume failed documents.
 
-A free-tier quota can stop a 40-document run part way through. Writing the report
+An interruption can stop a 40-document run part way through. Writing the report
 atomically after each attempt preserves saved results. An interruption before the
 checkpoint can lose the latest response. Resume skips saved successful documents.
 """
@@ -99,13 +99,15 @@ def metrics(details: list[dict], expected: dict[str, set[str]]) -> dict:
 
 def run_evaluation(output, folder=ROOT/'data', resume=None, policy=None, limit=None,
                    call=extract, sleep=time.sleep, monotonic=time.perf_counter, uniform=random.uniform,
-                   announce=print, database=None, mode='gemini') -> dict:
+                   announce=print, database=None, mode='ollama') -> dict:
     """Evaluate every failed or pending document, checkpointing to `output` after each step.
 
     With `resume`, successful extractions from that report are reused and only its failed
     documents are called again. The source report is never modified.
     """
-    policy = policy or RetryPolicy()
+    if mode != 'ollama':
+        raise ValueError('Resilient evaluation supports only Ollama')
+    policy = policy or RetryPolicy(max_attempts=1, pace=0)
     folder, output = Path(folder), Path(output)
     _check_paths(output, resume, limit)
     rows = list(csv.DictReader((folder/'ground_truth.csv').open(encoding='utf-8')))
@@ -151,8 +153,8 @@ def _load_source(resume, rows: list[dict]) -> dict | None:
     if not resume:
         return None
     source = json.loads(Path(resume).read_text())
-    if source['mode'] not in ('gemini', 'ollama') or len(source['details']) != len(rows):
-        raise ValueError('Resume requires a full Gemini report for this corpus')
+    if source['mode'] != 'ollama' or len(source['details']) != len(rows):
+        raise ValueError('Resume requires a full Ollama report for this corpus')
     if {r['filename'] for r in source['details']} != {r['filename'] for r in rows}:
         raise ValueError('Resume source document set differs from dataset')
     return source
@@ -163,7 +165,7 @@ def _starting_detail(row: dict, raw: bytes, prior: dict | None) -> dict:
     digest = hashlib.sha256(raw).hexdigest()
     if prior is None:
         pending = dict(fields={}, text='', error='Not attempted', error_kind='pending',
-                       error_code=None, model=None, mode='gemini', seconds=0)
+                       error_code=None, model=None, mode='ollama', seconds=0)
         return dict(compare(row, pending), source_hash=digest)
     if prior['ground_truth'] != {f: row[f] for f in FIELDS}:
         raise ValueError('Ground truth changed; do not reuse this report')
@@ -196,7 +198,7 @@ class _Run:
         self.started = monotonic()
         self.last_request_start = None
         self.report = dict(
-            mode='gemini', sample='full', run_id=run_stamp(),
+            mode='ollama', sample='full', run_id=run_stamp(),
             resume_source=resume_source, policy=asdict(policy), details=details,
             state='running', stop_reason=None, attempted_this_run=0,
             successful_calls_reused=sum(not r['error'] for r in details),

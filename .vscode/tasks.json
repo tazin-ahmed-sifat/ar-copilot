@@ -15,7 +15,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Run AR Copilot",
+      "label": "Run AR Copilot (Ollama)",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -27,7 +27,9 @@
         "run",
         "app.py",
         "--server.address",
-        "127.0.0.1"
+        "127.0.0.1",
+        "--browser.gatherUsageStats",
+        "false"
       ],
       "problemMatcher": []
     },
@@ -77,6 +79,19 @@
         "0",
         "--max-attempts",
         "1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Regenerate saved Ollama summary",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      },
+      "args": [
+        "scripts/publish_results.py",
+        "reports/ollama/resilient_20261010T222850202032Z.json"
       ],
       "problemMatcher": []
     }

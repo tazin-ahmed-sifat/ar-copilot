@@ -75,28 +75,6 @@ def test_lost_session_is_retained_without_guessing_duration(tmp_path, monkeypatc
     assert row.failure_reason == 'interrupted'
 
 
-def test_daily_quota_stops_and_does_not_retry(tmp_path, monkeypatch):
-    monkeypatch.setenv('AR_LOCAL_ONLY', '0')
-    app = page(tmp_path, monkeypatch)
-    app.segmented_control[0].set_value('assisted').run()
-    next(w for w in app.radio if w.label == 'Practice extraction').set_value('gemini').run()
-    monkeypatch.setattr('ar_copilot.config.configuration_status', lambda: {
-        'key_configured': True, 'model': 'gemini-3.8-flash'})
-    calls = []
-    def fake_extract(*args, **kwargs):
-        calls.append(1)
-        return dict(fields={}, seconds=0.00001, error='TEST-ONLY', model='gemini-3.8-flash',
-                    error_kind='daily_quota_exhausted')
-    monkeypatch.setattr('ar_copilot.extract.extract', fake_extract)
-    app.run()
-    button(app, 'Start next document').click().run()
-    assert not app.exception
-    assert len(calls) == 1
-    assert load_timings()[0].status == 'incomplete'
-    assert load_timings()[0].api_failed
-    assert button(app, 'Start next document').disabled
-
-
 def test_manual_entry_scoring_does_not_store_entered_values(tmp_path, monkeypatch):
     app = page(tmp_path, monkeypatch)
     button(app, 'Start next document').click().run()
@@ -117,7 +95,7 @@ def test_manual_entry_scoring_does_not_store_entered_values(tmp_path, monkeypatc
 def test_demo_proposal_corrections_and_decision_errors_are_scored(tmp_path, monkeypatch):
     app = page(tmp_path, monkeypatch)
     app.segmented_control[0].set_value('assisted').run()
-    next(w for w in app.radio if w.label == 'Practice extraction').set_value('demo').run()
+    next(w for w in app.checkbox if w.label == 'Replay offline demo fixtures for practice').check().run()
     button(app, 'Start next document').click().run()
     assert not app.exception
     next(w for w in app.text_input if w.label == 'Net').set_value('0.00')
@@ -127,3 +105,20 @@ def test_demo_proposal_corrections_and_decision_errors_are_scored(tmp_path, monk
     result = load_timings()[0]
     assert result.extraction_mode == 'demo' and result.fields_corrected == 1
     assert result.field_errors == 1 and result.decision_error is True
+
+def test_local_failure_remains_reviewable_without_provider_controls(tmp_path, monkeypatch):
+    app = page(tmp_path, monkeypatch)
+    assert not any('provider' in w.label.lower() or 'quota' in w.label.lower() for w in app.selectbox)
+    calls = []
+    def failure(*args, **kwargs):
+        calls.append(args[1])
+        return dict(fields={}, seconds=0.00001, error='Local server unavailable', model='qwen3:8b',
+                    error_kind='runtime_unavailable')
+    monkeypatch.setattr('ar_copilot.extract.extract', failure)
+    app.segmented_control[0].set_value('assisted').run()
+    button(app, 'Start next document').click().run()
+    assert not app.exception and calls == ['ollama']
+    assert app.warning
+    assert load_timings()[0].api_failed and load_timings()[0].failure_reason == 'runtime_unavailable'
+    button(app, 'Record incomplete attempt').click().run()
+    assert not app.exception and load_timings()[0].status == 'incomplete'

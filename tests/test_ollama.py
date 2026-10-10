@@ -28,12 +28,6 @@ def test_endpoint_rejected(endpoint,monkeypatch):
     monkeypatch.setenv('OLLAMA_BASE_URL',endpoint)
     with pytest.raises(ValueError): config.ollama_settings()
 
-def test_local_selection(monkeypatch):
-    monkeypatch.setenv('AR_LOCAL_ONLY','1')
-    assert config.providers()==['ollama','demo']
-    monkeypatch.setenv('AR_LOCAL_ONLY','0')
-    assert 'gemini' in config.providers()
-
 @pytest.mark.parametrize('failure',[TimeoutError(),ConnectionError(),ValueError('unavailable model')])
 def test_failure_to_review(failure,monkeypatch):
     monkeypatch.setattr('ar_copilot.extract.pdf_text',lambda pdf:'invoice')
@@ -41,12 +35,6 @@ def test_failure_to_review(failure,monkeypatch):
     monkeypatch.setattr(ollama,'request',fail)
     result=extract(b'pdf')
     assert result['error'] and not result['fields'] and result['mode']=='ollama'
-
-def test_no_fixture_or_cloud(monkeypatch):
-    monkeypatch.setattr('ar_copilot.extract.pdf_text',lambda pdf:'invoice')
-    monkeypatch.setenv('AR_LOCAL_ONLY','1')
-    result=extract(b'pdf','gemini')
-    assert 'disabled' in result['error']
 
 def test_context_rejected_before_request(monkeypatch):
     monkeypatch.setattr(ollama,'request',lambda *a:pytest.fail('must not send oversized input'))
@@ -87,3 +75,33 @@ def test_safe_ollama_summary(monkeypatch):
     assert summary['accuracy_on_completed']['field'] is None
     assert 'PRIVATE' not in json.dumps(summary) and 'private.pdf' not in json.dumps(summary)
     assert 'Ollama' in render_markdown(summary)
+
+def test_enforced_model_and_environment_precedence(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, 'ENV_PATH', tmp_path / '.env')
+    monkeypatch.delenv('OLLAMA_MODEL', raising=False)
+    monkeypatch.delenv('OLLAMA_BASE_URL', raising=False)
+    config.ENV_PATH.write_text('OLLAMA_MODEL=qwen3:8b\nOLLAMA_BASE_URL=http://127.0.0.1:11434\nUNRELATED_SECRET=PRIVATE_VALUE\n')
+    assert config.ollama_settings() == (config.OLLAMA_ENDPOINT, config.DEFAULT_MODEL)
+    monkeypatch.setenv('OLLAMA_MODEL', 'remote-model')
+    with pytest.raises(ValueError, match='installed local'):
+        config.ollama_settings()
+    monkeypatch.setenv('OLLAMA_MODEL', 'qwen3:8b')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'https://example.com')
+    with pytest.raises(ValueError, match='endpoint'):
+        config.ollama_settings()
+
+
+def test_unknown_extraction_mode_cannot_send_document(monkeypatch):
+    monkeypatch.setattr('ar_copilot.extract.pdf_text', lambda pdf: 'private invoice text')
+    monkeypatch.setattr(ollama, 'request', lambda *a: pytest.fail('unknown mode cannot invoke HTTP'))
+    result = extract(b'pdf', 'remote-provider')
+    assert result['error'] == 'Unknown extraction mode' and not result['fields']
+
+
+def test_cli_only_supports_ollama_or_explicit_demo():
+    from ar_copilot.evaluate import _parser
+    assert _parser().parse_args([]).mode == 'ollama'
+    assert _parser().parse_args(['--mode', 'demo']).mode == 'demo'
+    for args in (['--mode', 'remote-provider'], ['--list-models'], ['--check-config'], ['--model', 'remote']):
+        with pytest.raises(SystemExit):
+            _parser().parse_args(args)

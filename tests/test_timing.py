@@ -12,7 +12,7 @@ def timing(method='manual', seconds=60.0, errors=0, practice=False, mode='none')
 
 def test_csv_round_trip_preserves_types(tmp_path):
     path = tmp_path / 'timings.csv'
-    rows = [timing(seconds=61.5), timing(method='assisted', mode='gemini', practice=True)]
+    rows = [timing(seconds=61.5), timing(method='assisted', mode='ollama', practice=True)]
     for row in rows:
         append_timing(row, path)
     assert load_timings(path) == rows
@@ -48,19 +48,19 @@ def test_markdown_only_compares_manual_with_live_assisted_runs():
     from scripts.summarize_timings import render_markdown
     manual_only = render_markdown(summarise([timing(seconds=50), timing(method='assisted', mode='demo', seconds=10)]))
     assert 'No time-saved comparison' in manual_only
-    both = render_markdown(summarise([timing(seconds=50), timing(method='assisted', mode='gemini', seconds=20)]))
+    both = render_markdown(summarise([timing(seconds=50), timing(method='assisted', mode='ollama', seconds=20)]))
     assert 'No time-saved comparison' in both  # legacy rows have no comparable-set/order evidence
 
 
 def planned_rows():
     from dataclasses import replace
     from ar_copilot.timing import PROTOCOL, collection_plan
-    return [replace(timing(method=task['method'], mode='none' if task['method'] == 'manual' else 'gemini',
+    return [replace(timing(method=task['method'], mode='none' if task['method'] == 'manual' else 'ollama',
                            seconds=50 if task['method'] == 'manual' else 20),
                     attempt_id=f"test-{task['sequence']}", study_id='TEST-ONLY', cohort='A',
                     filename=task['filename'], pair_id=task['pair_id'], sequence=task['sequence'],
                     layout=task['layout'], protocol=PROTOCOL, decision_error=False, corpus_id='TEST-CORPUS',
-                    model='gemini-3.8-flash' if task['method'] == 'assisted' else '')
+                    model='qwen3:8b' if task['method'] == 'assisted' else '')
             for task in collection_plan('A')]
 
 
@@ -71,7 +71,7 @@ def test_matched_comparison_formula_and_publication_privacy():
     result = summary['comparison']
     assert result['completed_pairs'] == 6 and result['percentage_time_reduction'] == 60
     text = render_markdown(summary)
-    assert 'manual minus assisted (Gemini): 30.0 s' in text
+    assert 'manual minus assisted (Ollama): 30.0 s' in text
     assert 'Percentage time reduction: 60.0%' in text
     assert all(private not in json.dumps(summary) + text for private in ('tester', 'NC-', 'TEST-ONLY', 'test-1'))
 
@@ -80,9 +80,9 @@ def test_incomplete_pairs_errors_and_api_failures_are_not_silently_dropped():
     from dataclasses import replace
     rows = planned_rows()
     rows[1] = replace(rows[1], status='incomplete', field_errors=None, decision='',
-                      decision_error=None, api_failed=True, failure_reason='daily_quota_exhausted')
+                      decision_error=None, api_failed=True, failure_reason='runtime_unavailable')
     summary = summarise(rows)
-    assisted = summary['groups']['assisted/gemini']
+    assisted = summary['groups']['assisted/ollama']
     assert assisted['documents'] == 6 and assisted['completed'] == 5 and assisted['incomplete'] == 1
     assert assisted['api_failures'] == 1
     assert summary['comparison']['completed_pairs'] == 5
@@ -181,3 +181,19 @@ def test_mixed_corpus_refuses_comparison():
     rows = planned_rows()
     rows[0] = replace(rows[0], corpus_id='OTHER-TEST-CORPUS')
     assert not summarise(rows)['comparison']['available']
+
+def test_historical_timing_rows_remain_readable_but_cannot_be_new_attempts(tmp_path):
+    import csv
+    import pytest
+    from dataclasses import asdict, replace
+    from ar_copilot.timing import COLUMNS
+    row=replace(timing(method='assisted', mode='retired-provider'), failure_reason='retired-error')
+    path=tmp_path/'historical.csv'
+    with path.open('w',newline='',encoding='utf-8') as handle:
+        writer=csv.DictWriter(handle,fieldnames=COLUMNS); writer.writeheader(); writer.writerow(asdict(row))
+    before=path.read_bytes()
+    loaded=load_timings(path)
+    assert loaded == [row] and path.read_bytes()==before
+    assert not summarise(loaded)['comparison']['available']
+    with pytest.raises(ValueError,match='method/extraction mode'):
+        append_timing(row,path)

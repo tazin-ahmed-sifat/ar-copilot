@@ -1,16 +1,15 @@
 """Score raw extraction against printed ground truth, before any human correction.
 
 Demo mode replays fixtures that were built from the truth, so its scores test the
-plumbing only; they are labelled as such and never reported as Gemini accuracy.
+plumbing only; they are labelled as such and never reported as Ollama accuracy.
 """
 import argparse
 import csv
 import hashlib
 import json
-import os
 from pathlib import Path
 
-from .config import ROOT, configuration_status, gemini_settings, local_only
+from .config import ROOT
 from .core import FIELDS, validate
 from .extract import extract
 from .resilient import load_expected, run_stamp, score_fields
@@ -56,17 +55,17 @@ def _report(details: list[dict], mode: str, sample: str, expected: dict[str, set
     seconds = [r['seconds'] for r in details]
     return dict(
         mode=mode, provider=mode, sample=sample,
-        model_settings=details[0].get('model_settings', {}), measured_gemini_accuracy=mode == 'gemini' and successes > 0,
-        label='OFFLINE FIXTURE CHECK - NOT GEMINI ACCURACY' if mode == 'demo' else mode + ' raw extraction evaluation',
+        model_settings=details[0].get('model_settings', {}), measured_ollama_accuracy=mode == 'ollama' and successes > 0,
+        label='OFFLINE FIXTURE CHECK - NOT OLLAMA ACCURACY' if mode == 'demo' else mode + ' raw extraction evaluation',
         documents=n, successful_extractions=successes, extraction_errors=n - successes,
         fields=FIELDS, field_accuracy={f: correct[f] / n for f in FIELDS},
         overall_field_accuracy=sum(correct.values()) / (n * len(FIELDS)),
         document_accuracy=exact / n, validation=validation,
         seconds_total=sum(seconds), seconds_mean=sum(seconds) / n,
-        # A clean three-layout smoke test is the gate before spending quota on all 40.
+        # A clean three-layout smoke test is the gate before running all 40.
         completed_document_accuracy=exact / successes if successes else None,
         completion_rate=successes/n,
-        full_evaluation_ready=(mode in ('gemini', 'ollama') and sample == 'per-layout' and exact == n
+        full_evaluation_ready=(mode == 'ollama' and sample == 'per-layout' and exact == n
                                and not any(r['validation'] for r in details)),
         details=details,
     )
@@ -80,41 +79,17 @@ def database_fingerprint() -> str | None:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Evaluate extraction against the fictional ground truth.')
-    parser.add_argument('--mode', choices=['ollama', 'demo', 'gemini'], default='ollama')
+    parser.add_argument('--mode', choices=['ollama', 'demo'], default='ollama')
     parser.add_argument('--sample', choices=['full', 'per-layout'], default='full')
-    parser.add_argument('--check-config', action='store_true', help='show whether a key is set, never the key')
-    parser.add_argument('--list-models', action='store_true', help='list models this key can call')
-    parser.add_argument('--model', help='override the model for this run without changing .env')
-    parser.add_argument('--resume', type=Path, help='retry only failed or pending documents from a full Gemini report')
+    parser.add_argument('--resume', type=Path, help='retry only failed or pending documents from a full Ollama report')
     parser.add_argument('--resilient', action='store_true', help='paced run with retries and checkpoints')
     parser.add_argument('--limit', type=int, help='maximum failed or pending documents to attempt')
-    parser.add_argument('--pace', type=float, default=12)
-    parser.add_argument('--max-attempts', type=int, default=4)
+    parser.add_argument('--pace', type=float, default=0)
+    parser.add_argument('--max-attempts', type=int, default=1)
     parser.add_argument('--base-delay', type=float, default=2)
     parser.add_argument('--max-delay', type=float, default=30)
     parser.add_argument('--max-wait', type=float, default=120)
     return parser
-
-
-def _list_models() -> int:
-    if local_only():
-        print('Cloud model discovery is disabled in local-only mode.')
-        return 2
-    from google import genai
-
-    key, _ = gemini_settings()
-    if not key:
-        print('Gemini key is not configured.')
-        return 2
-    try:
-        with genai.Client(api_key=key, http_options={'timeout': 60000}) as client:
-            for model in client.models.list():
-                if 'generateContent' in (model.supported_actions or []):
-                    print(model.name)
-    except Exception as exc:
-        print(f'Model discovery failed: {type(exc).__name__}; HTTP code: {getattr(exc, "code", None)}')
-        return 2
-    return 0
 
 
 def _run_resilient(args) -> int:
@@ -142,28 +117,17 @@ def _run_single(args) -> int:
     print(json.dumps({k: v for k, v in report.items() if k != 'details'}, indent=2))
     print(f'Report: {path}')
     if report['full_evaluation_ready']:
-        tested_model = report['details'][0]['model']
         print('Three-layout smoke test passed. Full run: '
-              f'python -m ar_copilot.evaluate --mode {args.mode} --sample full --model {tested_model}')
+              f'python -m ar_copilot.evaluate --mode {args.mode} --sample full --resilient --pace 0 --max-attempts 1')
     return 0
 
 
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
-    if args.check_config:
-        print(json.dumps(configuration_status(), indent=2))
-        return 0
-    if args.model:
-        os.environ['OLLAMA_MODEL' if args.mode == 'ollama' else 'GEMINI_MODEL'] = args.model
-    if args.list_models:
-        return _list_models()
-    if args.mode == 'gemini' and not configuration_status()['key_configured']:
-        print('Gemini key not configured. Save it locally in .env; no API calls or measured results produced.')
-        return 2
     if args.resilient or args.resume:
-        if args.mode not in ('gemini', 'ollama') or args.sample != 'full':
-            parser.error('Resilient/resume runs require --mode gemini --sample full')
+        if args.mode != 'ollama' or args.sample != 'full':
+            parser.error('Resilient/resume runs require --mode ollama --sample full')
         return _run_resilient(args)
     return _run_single(args)
 

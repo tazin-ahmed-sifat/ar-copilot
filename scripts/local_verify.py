@@ -8,26 +8,27 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import csv
+from datetime import datetime, timezone
 import io
 import json
 from decimal import Decimal
 import pymupdf as fitz
 from PIL import Image, ImageDraw
 from streamlit.testing.v1 import AppTest
-from google.genai import types
 from ar_copilot.core import DEMO_REPORTING_DATE, FIELDS, validate, aged_debt
-from ar_copilot.extract import extract, Invoice
+from ar_copilot.extract import extract
 from ar_copilot.store import Store
 from ar_copilot.export import workbook
 
 def main():
     tmp = Path('tmp/qa'); tmp.mkdir(parents=True, exist_ok=True)
-    output = Path('output'); output.mkdir(exist_ok=True)
+    output = Path('output') / ('qa_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+    output.mkdir(parents=True, exist_ok=False)
     # Explicit QA database, separate from the app's user review database.
     store = Store(':memory:')
     for path in sorted(Path('data/invoices').glob('*.pdf')):
         raw = path.read_bytes()
-        result = extract(raw)
+        result = extract(raw, 'demo')
         document_id = store.ingest(path.name, raw, result)
         record = next(r for r in store.documents() if r['id']==document_id)
         if not validate(result['fields']) and record['status'] != 'approved':
@@ -49,12 +50,10 @@ def main():
     for i, image in enumerate(images):
         sheet.paste(image, ((i%3)*image.width, (i//3)*image.height))
     sheet.save(tmp/'pdf_contact_sheet.png')
-    # Installed official SDK accepts the documented structured output configuration.
-    types.GenerateContentConfig(response_mime_type='application/json', response_json_schema=Invoice.model_json_schema())
     summary = dict(approved=sum(r['status']=='approved' for r in records),
                    unresolved=sum(r['status']!='approved' for r in records),
                    debt_rows=len(debt), balance=str(sum((r['balance'] for r in debt), Decimal('0'))),
-                   live_gemini_verified=False, microsoft365_configured=False)
+                   extraction_mode='demo', live_ollama_verified=False, microsoft365_configured=False)
     (output/'local_verification.json').write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
 

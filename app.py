@@ -7,7 +7,6 @@ import hashlib
 
 import streamlit as st
 
-from ar_copilot.config import providers
 from ar_copilot.extract import extract
 from ar_copilot.payments import parse_payment_csv
 from ar_copilot.store import Store
@@ -15,7 +14,6 @@ from ar_copilot.ui import data_dir, open_store
 
 MAX_PDF_BYTES = 10 * 1024 * 1024
 DEMO_DOCUMENTS = 40
-MODES = {p: {'ollama': 'Ollama (local)', 'demo': 'Offline fixtures', 'gemini': 'Gemini'}[p] for p in providers()}
 
 st.set_page_config(page_title='AR Copilot', page_icon=':material/receipt_long:', layout='wide')
 
@@ -81,13 +79,12 @@ with st.sidebar:
     st.subheader('Documents')
     if st.button('Load 40 offline demo documents', width='stretch'):
         load_demo(store)
-    mode = st.radio('Extract uploads with', list(MODES), format_func=MODES.get, horizontal=True)
+    demo_uploads = st.checkbox('Replay offline demo fixtures for uploads', value=False)
+    mode = 'demo' if demo_uploads else 'ollama'
     if mode == 'demo':
-        st.caption('Fixtures replay the known answer for the generated demo PDFs. They are not Gemini results.')
+        st.caption('Fixtures replay the known answer for the generated demo PDFs. They are not Ollama extraction results.')
     elif mode == 'ollama':
-        st.caption('Local-only inference: qwen3:8b on 127.0.0.1. Every result requires review.')
-    else:
-        st.caption("Gemini receives each PDF's text when you press Extract.")
+        st.caption('Local LLM extraction: qwen3:8b on 127.0.0.1. Every result requires review.')
     uploads = st.file_uploader('Invoice PDFs', type=['pdf'], accept_multiple_files=True, max_upload_size=10)
     if st.button('Extract', disabled=not uploads, width='stretch'):
         extract_uploads(store, uploads, mode)

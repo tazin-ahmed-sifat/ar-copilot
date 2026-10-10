@@ -84,13 +84,13 @@ def count_corrections(extracted, final):
     return sum((extracted.get(f) or '').strip() != (final.get(f) or '').strip() for f in FIELDS)
 
 
-def validate_timing(t):
+def validate_timing(t, *, historical=False):
     recorded = datetime.fromisoformat(t.recorded_at)
     if recorded.utcoffset() != timedelta(0) or not t.operator.strip():
         raise ValueError('Timing requires a UTC timestamp and operator alias')
     if t.protocol not in ('legacy', 'practice-v1', PROTOCOL) or (t.protocol == 'practice-v1' and not t.practice):
         raise ValueError('Invalid timing protocol')
-    if (t.method, t.extraction_mode) not in {('manual', 'none'), ('assisted', 'demo'), ('assisted', 'gemini'), ('assisted', 'ollama')}:
+    if not historical and (t.method, t.extraction_mode) not in {('manual', 'none'), ('assisted', 'demo'), ('assisted', 'ollama')}:
         raise ValueError('Invalid method/extraction mode')
     if t.status not in ('in_progress', 'completed', 'incomplete'):
         raise ValueError('Invalid attempt status')
@@ -106,8 +106,8 @@ def validate_timing(t):
         raise ValueError('Invalid correction count')
     if t.method == 'manual' and (t.extraction_seconds or t.api_failed or t.fields_corrected or t.model):
         raise ValueError('Manual attempt cannot have extraction metadata')
-    if t.failure_reason not in ('', 'abandoned', 'interrupted', 'daily_quota_exhausted', 'zero_quota',
-                              'credits_exhausted', 'temporary_server_error', 'temporary_or_unknown_rate_limit',
+    if not historical and t.failure_reason not in ('', 'abandoned', 'interrupted', 'timeout', 'model_unavailable',
+                              'runtime_unavailable', 'invalid_response_or_input', 'temporary_server_error', 'temporary_or_unknown_rate_limit',
                               'non_retryable_error', 'legacy_unclassified'):
         raise ValueError('Invalid failure category')
     if t.protocol == PROTOCOL:
@@ -167,7 +167,7 @@ def load_timings(path=None):
         rows = [_parse_row(row) for row in csv.DictReader(handle)]
     latest, legacy = {}, []
     for row in rows:
-        validate_timing(row)
+        validate_timing(row, historical=True)
         if not row.attempt_id:
             legacy.append(row)
             continue
@@ -197,6 +197,8 @@ def comparison(timings):
     unavailable = dict(available=False, reason='Needs all 12 planned attempts per participant; legacy/demo rows are descriptive only.')
     if not measured:
         return unavailable
+    if any(r.method == 'assisted' and r.extraction_mode != 'ollama' for r in measured):
+        return dict(available=False, reason='Historical extraction modes are excluded from the Ollama comparison.')
     if len({r.corpus_id for r in measured}) != 1:
         return dict(available=False, reason='Different corpora must be summarized separately.')
     if len({(r.extraction_mode, r.model) for r in measured if r.method == 'assisted'}) != 1:
@@ -208,7 +210,7 @@ def comparison(timings):
     for batch in batches.values():
         if len({r.cohort for r in batch}) != 1 or len(batch) != 12 or {r.sequence for r in batch} != set(range(1, 13)):
             return unavailable
-        if any(r.status == 'in_progress' or (r.method == 'assisted' and (r.extraction_mode, r.model) not in {('gemini', 'gemini-3.8-flash'), ('ollama', 'qwen3:8b')}) for r in batch):
+        if any(r.status == 'in_progress' or (r.method == 'assisted' and (r.extraction_mode, r.model) not in {('ollama', 'qwen3:8b')}) for r in batch):
             return unavailable
         if any(r.operator == batch[0].operator and r.corpus_id == batch[0].corpus_id and r not in batch
                and r.filename in {b.filename for b in batch} for r in timings):
@@ -230,14 +232,14 @@ def comparison(timings):
                 completed_pairs=len(paired), incomplete_pairs_excluded=excluded,
                 manual_seconds=_spread(manual), assisted_seconds=_spread(assisted),
                 median_difference_seconds=m-a, percentage_time_reduction=100*(m-a)/m,
-                definition='100 * (manual median - Gemini-assisted median) / manual median on matched completed pairs; negative means slower.',
+                definition='100 * (manual median - Ollama-assisted median) / manual median on matched completed pairs; negative means slower.',
                 limitation='Different invoices matched by layout; synthetic pilot, no causal claim. Incomplete pairs excluded from medians but retained in attempt counts; completion bias remains.')
 
 
 def summarise(timings):
     groups = {}
     for timing in timings:
-        validate_timing(timing)
+        validate_timing(timing, historical=True)
         if not timing.practice:
             groups.setdefault(f'{timing.method}/{timing.extraction_mode}', []).append(timing)
     summary = {}

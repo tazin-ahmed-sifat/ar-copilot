@@ -13,7 +13,7 @@ import re
 import subprocess
 import zipfile
 from dotenv import dotenv_values
-from ar_copilot.config import ROOT, gemini_settings
+from ar_copilot.config import ROOT
 
 PUBLIC_DIRECTORIES = ['ar_copilot', 'excel', 'views', 'tests', 'scripts', 'docs', 'results', '.vscode', '.streamlit']
 PUBLIC_FILES = ['app.py', 'README.md', 'requirements.txt', 'requirements.lock.txt', '.gitignore', '.env.example']
@@ -47,11 +47,8 @@ def audit():
         candidates.extend(path for path in (ROOT/directory).rglob('*')
                           if path.is_file() and is_publishable(path))
     candidates=sorted(set(candidates))
-    key,_=gemini_settings()
     private_values = [value for name, value in dotenv_values(ROOT / '.env').items()
-                      if name != 'GEMINI_MODEL' and value and len(value) >= 8]
-    if key:
-        private_values.append(key)
+                      if name not in ('OLLAMA_MODEL', 'OLLAMA_BASE_URL') and value and len(value) >= 8]
     patterns=[rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
               rb'gh[pousr]_[A-Za-z0-9]{20,}', rb'github_pat_[A-Za-z0-9_]{30,}',
               rb'AIza[A-Za-z0-9_-]{30,}', rb'AKIA[A-Z0-9]{16}']
@@ -61,8 +58,8 @@ def audit():
             findings.append(path.relative_to(ROOT).as_posix())
     if findings:
         raise SystemExit('Potential credential detected in these files (values withheld): '+', '.join(findings))
-    env_example=(ROOT/'.env.example').read_text()
-    if any(line.startswith('GEMINI_API_KEY=') and line.partition('=')[2].strip() for line in env_example.splitlines()):
+    if any(value for name, value in dotenv_values(ROOT / '.env.example').items()
+           if re.search(r'KEY|TOKEN|SECRET|PASSWORD', name, re.I)):
         raise SystemExit('.env.example contains a nonempty credential field')
     staged=subprocess.run(['git','-c',f'safe.directory={ROOT.as_posix()}', 'diff','--cached','--name-only','--diff-filter=ACMRT'],cwd=ROOT,check=True,capture_output=True,text=True).stdout.splitlines()
     allowed={p.relative_to(ROOT).as_posix() for p in candidates}

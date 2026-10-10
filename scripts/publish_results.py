@@ -1,4 +1,4 @@
-"""Reduce a raw Gemini report to a metrics-only summary that is safe to commit.
+"""Reduce a raw Ollama report to a metrics-only summary that is safe to commit.
 
 Raw reports under reports/ hold extracted text and field values, so they stay
 ignored. The summary keeps only counts and rates, which is what the README cites.
@@ -20,8 +20,8 @@ from ar_copilot.resilient import load_expected, metrics
 
 RESULTS = ROOT / 'results'
 # Output name and table title per evaluation sample.
-OUTPUTS = {'full': ('gemini_summary', 'Gemini extraction results'),
-           'per-layout': ('gemini_smoke_summary', 'Gemini smoke test: one document per layout')}
+OUTPUTS = {'full': ('ollama_summary', 'Ollama extraction results'),
+           'per-layout': ('ollama_smoke_summary', 'Ollama smoke test: one document per layout')}
 FIELD_COUNT = len(FIELDS)
 
 
@@ -37,7 +37,7 @@ def public_summary(report: dict, expected: dict[str, set[str]]) -> dict:
     credits = [r for r in details if r.get('ground_truth', {}).get('document_type') == 'credit_note']
     completed_credits = [r for r in credits if not r['error']]
     return {
-        'provider': report.get('mode', 'gemini'),
+        'provider': report.get('mode', 'ollama'),
         'model_settings': report.get('model_settings', {}),
         'source_run': report['run_id'],
         'sample': report.get('sample', 'full'),
@@ -144,7 +144,7 @@ def render_markdown(summary: dict) -> str:
     if summary['resume']['stop_reason']:
         rows.append(('Stop reason', summary['resume']['stop_reason']))
     lines = [
-        f"# {OUTPUTS[summary['sample']][1].replace('Gemini', summary.get('provider', 'gemini').capitalize())}",
+        f"# {OUTPUTS[summary['sample']][1]}",
         '',
         f"Run `{summary['source_run']}`, model {', '.join(summary['models'])}, "
         f"{documents} fictional documents, exact string match on {FIELD_COUNT} fields.",
@@ -160,14 +160,14 @@ def render_markdown(summary: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('report', type=Path, help='raw full, resilient or per-layout report under reports/gemini/')
+    parser.add_argument('report', type=Path, help='raw full, resilient or per-layout report under reports/ollama/')
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
-    if report.get('mode') not in ('gemini', 'ollama') or report.get('sample') not in OUTPUTS:
-        raise SystemExit('Only Gemini runs are published; demo fixture checks are not accuracy.')
+    if report.get('mode') != 'ollama' or report.get('sample') not in OUTPUTS:
+        raise SystemExit('Only Ollama runs are published; demo fixture checks are not accuracy.')
     summary = public_summary(report, load_expected(ROOT / 'data'))
     RESULTS.mkdir(exist_ok=True)
-    name = OUTPUTS[summary['sample']][0].replace('gemini', report['mode'])
+    name = OUTPUTS[summary['sample']][0]
     (RESULTS / f'{name}.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
     (RESULTS / f'{name}.md').write_text(render_markdown(summary), encoding='utf-8')
     print(f'Wrote results/{name}.json and results/{name}.md')

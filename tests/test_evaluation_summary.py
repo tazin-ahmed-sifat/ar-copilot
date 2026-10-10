@@ -57,23 +57,23 @@ def test_smoke_summary_only_counts_anomalies_in_the_run():
     summary = public_summary(dict(run_id='mock', sample='per-layout', details=details),
                              {'elsewhere.pdf': {'totals'}})
     assert summary['accounting_anomalies']['expected'] == 0
-    assert render_markdown(summary).startswith('# Gemini smoke test')
+    assert render_markdown(summary).startswith('# Ollama smoke test')
 
 
 def test_public_summary_separates_failed_credit_from_extraction_mistake():
     from scripts.publish_results import public_summary, render_markdown
     def row(name, error, credit=False):
         return dict(filename=name, model='mock', error=error, error_code=429 if error else None,
-                    error_kind='daily_quota_exhausted' if error else None, seconds=1,
+                    error_kind='runtime_unavailable' if error else None, seconds=1,
                     validation=[], matches={f: False for f in FIELDS},
                     ground_truth={'document_type': 'credit_note' if credit else 'invoice'})
     report = dict(run_id='mock', sample='full', details=[row('credit.pdf', 'failed', True),
                   row('invoice.pdf', None)], new_request_seconds=0.5,
-                  stop_reason='daily_quota_exhausted')
+                  stop_reason='runtime_unavailable')
     summary = public_summary(report, {})
     assert summary['credit_notes'] == dict(documents=1, completed=0, exact_documents=0, unassessed=1)
     assert summary['extraction_mistakes'] == dict(completed_documents_with_mismatches=1,
                                                  incorrect_fields_on_completed=12)
-    assert summary['completion']['failures_by_kind'] == {'daily_quota_exhausted': 1}
+    assert summary['completion']['failures_by_kind'] == {'runtime_unavailable': 1}
     assert summary['processing_seconds']['new_request_seconds'] == 0.5
-    assert 'daily_quota_exhausted' in render_markdown(summary)
+    assert 'runtime_unavailable' in render_markdown(summary)

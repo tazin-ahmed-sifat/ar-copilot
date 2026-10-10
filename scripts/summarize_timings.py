@@ -54,12 +54,12 @@ def _comparison(summary):
     manual, assisted = result['manual_seconds'], result['assisted_seconds']
     return (f"Matched completed pairs: {result['completed_pairs']} across {result['participants']} participant(s); "
             f"{result['incomplete_pairs_excluded']} incomplete pairs excluded from this time comparison. "
-            f"Manual median {_seconds(manual['median'])} s, Gemini-assisted median {_seconds(assisted['median'])} s. "
+            f"Manual median {_seconds(manual['median'])} s, Ollama-assisted median {_seconds(assisted['median'])} s. "
             f"Matched manual Q1-Q3 {_seconds(manual['q1'])} to {_seconds(manual['q3'])} s, "
             f"range {_seconds(manual['min'])} to {_seconds(manual['max'])} s; "
             f"matched assisted Q1-Q3 {_seconds(assisted['q1'])} to {_seconds(assisted['q3'])} s, "
             f"range {_seconds(assisted['min'])} to {_seconds(assisted['max'])} s. "
-            f"Median difference, manual minus assisted (Gemini): {result['median_difference_seconds']:.1f} s. "
+            f"Median difference, manual minus assisted (Ollama): {result['median_difference_seconds']:.1f} s. "
             f"Percentage time reduction: {result['percentage_time_reduction']:.1f}%. "
             f"Definition: {result['definition']} {result['limitation']}")
 

@@ -1,8 +1,8 @@
-"""Write a detailed local summary next to a raw Gemini report, including per-document mismatches.
+"""Write a detailed local summary next to a raw Ollama report, including per-document mismatches.
 
 The output stays under reports/ (ignored by Git) because it contains extracted values;
 scripts/publish_results.py produces the metrics-only version that is committed.
-Never calls Gemini and never opens the review database.
+Never calls Ollama and never opens the review database.
 """
 import sys
 from pathlib import Path
@@ -84,8 +84,8 @@ def main() -> None:
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     report = json.loads(args.report.read_text())
-    if report['mode'] not in ('gemini', 'ollama'):
-        raise SystemExit('This summary is for Gemini reports only; demo stays separate.')
+    if report['mode'] != 'ollama':
+        raise SystemExit('This summary is for Ollama reports only; demo stays separate.')
     result = summarize(report, json.loads((root/'data/anomalies.json').read_text()))
     destination = args.report.with_name(args.report.stem + '_summary.json')
     destination.write_text(json.dumps(result, indent=2))

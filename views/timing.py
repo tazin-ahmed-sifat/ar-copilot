@@ -7,10 +7,8 @@ from pathlib import Path
 from uuid import uuid4
 import streamlit as st
 from ar_copilot import config
-from ar_copilot.config import configuration_status, providers
 from ar_copilot.core import FIELDS, validate
 from ar_copilot.extract import extract
-from ar_copilot.retry import STOP_KINDS
 from ar_copilot.timing import (Timing, PROTOCOL, PRACTICE_DOCUMENTS, append_timing, collection_plan,
                                count_corrections, count_field_errors, load_timings, summarise)
 from ar_copilot.timing import timing_corpus_id
@@ -51,10 +49,7 @@ with st.container(border=True):
     if practice:
         practice_method = st.segmented_control('Practice method', ['manual', 'assisted'], default='manual', disabled=bool(session))
         if practice_method == 'assisted':
-            practice_mode = st.radio('Practice extraction', providers(), disabled=bool(session))
-    assisted_provider = st.selectbox('Measured extraction provider', [p for p in providers() if p != 'demo'], disabled=bool(session))
-    quota_reset = st.checkbox('I have confirmed available Gemini quota after a previous quota stop',
-                              value=False, disabled=bool(session))
+            practice_mode = 'demo' if st.checkbox('Replay offline demo fixtures for practice', disabled=bool(session)) else 'ollama'
     unseen = st.checkbox('I had not read the measured timing documents before this study', disabled=bool(session))
 
 if not session:
@@ -94,20 +89,13 @@ if not session:
             st.error('This document was already attempted. Repeating it would introduce learning bias. '
                      'Do not restart this plan under a new study code.')
             st.stop()
-        mode = assisted_provider if task and task['method'] == 'assisted' else 'none'
+        mode = 'ollama' if task and task['method'] == 'assisted' else 'none'
     if task:
         st.info(f"Next: {'key by hand' if task['method'] == 'manual' else mode + ' extraction and review'}"
                 + (f" - task {task['sequence']}/12, layout {task['layout']}" if not practice else ' - practice'))
     else:
         st.caption('This practice method/set or the measured plan is finished.')
-    settings = configuration_status() if mode == 'gemini' else {}
-    quota_stopped = any(r.operator == operator.strip() and r.failure_reason in STOP_KINDS for r in rows)
-    blocked = mode == 'gemini' and (not settings.get('key_configured') or settings.get('model') != 'gemini-3.8-flash'
-                                   or (quota_stopped and not quota_reset))
-    if blocked:
-        st.warning('Gemini needs configured gemini-3.8-flash and available quota. After a quota stop, '
-                   'confirm the reset before starting another API attempt. Do not enable billing.')
-    ready = bool(operator.strip() and study_id.strip() and task) and not blocked and (practice or unseen)
+    ready = bool(operator.strip() and study_id.strip() and task) and (practice or unseen)
     if st.button('Start next document', type='primary', disabled=not ready):
         started = time.perf_counter()
         attempt = Timing(recorded_at=stamp(), operator=operator.strip(), method=task['method'],
@@ -116,7 +104,7 @@ if not session:
                          attempt_id=uuid4().hex, status='in_progress', duration_known=False,
                          study_id=study_id.strip(), cohort=cohort, pair_id=task['pair_id'],
                          sequence=task['sequence'], layout=task['layout'],
-                         model=settings.get('model', ''), protocol='practice-v1' if practice else PROTOCOL,
+                         model=config.DEFAULT_MODEL if mode == 'ollama' else '', protocol='practice-v1' if practice else PROTOCOL,
                          corpus_id=corpus_id, extraction_finished=(task['method'] == 'manual'))
         append_timing(attempt) # record before file loading/API so a crash cannot erase the attempt
         session.update(attempt=attempt, started=started, extraction={'fields': {}, 'seconds': 0, 'error': None})
@@ -131,11 +119,6 @@ if not session:
                               failure_reason=result.get('error_kind', 'legacy_unclassified') if result['error'] else '')
             session['attempt'] = attempt
             append_timing(attempt)
-            if attempt.failure_reason in STOP_KINDS:
-                append_timing(replace(attempt, recorded_at=stamp(), seconds=time.perf_counter()-started,
-                                      status='incomplete', duration_known=True))
-                st.session_state.pop('timing')
-                st.rerun()
         st.rerun()
 else:
     attempt, extraction = session['attempt'], session['extraction']

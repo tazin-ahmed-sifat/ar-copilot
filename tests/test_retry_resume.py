@@ -1,4 +1,4 @@
-"""No network: deterministic retries, quota stops, pacing and checkpoints."""
+"""No network: deterministic retries, pacing and checkpoints."""
 import json
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -11,7 +11,7 @@ from ar_copilot.core import FIELDS
 
 def result(code=None, kind=None, hint=None):
     return dict(fields={},text='',error='mock failure' if code else None,error_code=code,
-                error_kind=kind,retry_after_seconds=hint,seconds=.1,model='mock',mode='gemini')
+                error_kind=kind,retry_after_seconds=hint,seconds=.1,model='qwen3:8b',mode='ollama')
 
 def test_backoff_jitter_and_retry_after():
     responses=iter([result(429,'temporary_or_unknown_rate_limit',5),result(503,'temporary_server_error'),result()])
@@ -27,37 +27,13 @@ def test_retry_after_http_date_and_invalid_values():
     assert retry_after('NaN') is None and retry_after('bad') is None
     assert retry_after('-2')==0
 
-@pytest.mark.parametrize('details,expected',[
-    ({'error':{'details':[{'violations':[{'quotaId':'GenerateRequestsPerDayPerProjectPerModel'}]}]}},'daily_quota_exhausted'),
-    ({'error':{'message':'limit: 0'}},'zero_quota'),
-    ({'error':{'type':'quota_exceeded'}},'daily_quota_exhausted'),
-    ({'error':{'details':[{'violations':[{'quotaId':'GenerateRequestsPerMinutePerProjectPerModel'}]}]}},'temporary_or_unknown_rate_limit')])
-def test_quota_classification(details,expected):
-    exc=SimpleNamespace(code=429,details=details,response=SimpleNamespace(headers={'Retry-After':'3'}))
-    meta=error_metadata(exc)
-    assert meta['error_kind']==expected and meta['retry_after_seconds']==3
-
-def test_retry_info_is_honored_without_persisting_body():
-    exc=SimpleNamespace(code=503,message='FAKE_SECRET',details={'error':{'details':[
-        {'@type':'type.googleapis.com/google.rpc.RetryInfo','retryDelay':'7.5s'}]}})
-    assert error_metadata(exc)['retry_after_seconds']==7.5
-    assert 'FAKE_SECRET' not in json.dumps(error_metadata(exc))
-
-@pytest.mark.parametrize('kind',['daily_quota_exhausted','zero_quota','credits_exhausted'])
-def test_hard_quota_stops_without_retry(kind):
-    calls=[]
-    def call():
-        calls.append(1); return result(429,kind)
-    output=run_with_retry(call,RetryPolicy(),sleep=lambda _:pytest.fail('must not sleep'))
-    assert len(calls)==1 and output['stop_reason']==kind
-
 def test_retry_budget_and_long_retry_after():
     calls=[]
     def call():
         calls.append(1); return result(429,'temporary_or_unknown_rate_limit')
     output=run_with_retry(call,RetryPolicy(2,1,2,10,0),sleep=lambda _:None)
     assert len(calls)==2 and output['stop_reason']=='rate_limit_retry_budget_exhausted'
-    output=run_with_retry(lambda:result(503,'temporary_server_error',100),RetryPolicy(max_wait=20),sleep=lambda _:pytest.fail('must not truncate server delay'))
+    output=run_with_retry(lambda:result(503,'temporary_server_error',100),RetryPolicy(max_attempts=2,max_wait=20),sleep=lambda _:pytest.fail('must not truncate server delay'))
     assert len(output['attempts'])==1 and output['stop_reason']=='server_retry_after_exceeds_wait_budget'
     assert len(run_with_retry(lambda:result(400,'non_retryable_error'),RetryPolicy())['attempts'])==1
 
@@ -72,8 +48,10 @@ def seed(tmp_path,monkeypatch):
             r['fields']={f:rows[i][f] for f in FIELDS}
         return r
     monkeypatch.setattr(legacy,'extract',fake)
-    report=legacy.evaluate(data,'gemini')
+    report=legacy.evaluate(data,'ollama')
     report['run_id']='mock'
+    from ar_copilot.ollama import OPTIONS
+    report['model_settings']=dict(OPTIONS, think=False, timeout_seconds=120)
     source=tmp_path/'original.json'; source.write_text(json.dumps(report))
     database=tmp_path/'db.sqlite'; database.write_bytes(b'unchanged test database')
     return data,rows,source,database
@@ -98,15 +76,6 @@ def test_resume_only_failed_and_preserve_original(seed,tmp_path):
     assert report['review_database_unchanged'] and json.loads(output.read_text())['attempted_this_run']==1
     with pytest.raises(ValueError):
         run_evaluation(source,data,source)
-
-def test_quota_stop_does_not_attempt_next_document(seed,tmp_path):
-    data,rows,source,database=seed
-    calls=[]
-    def call(*args,**kwargs):
-        calls.append(1); return result(429,'daily_quota_exhausted')
-    report=run_evaluation(tmp_path/'stop.json',data,source,call=call,database=database)
-    assert calls==[1] and report['stop_reason']=='daily_quota_exhausted'
-    assert report['metrics']['completed_documents']==4
 
 def test_checkpoint_survives_interruption_and_pacing(seed,tmp_path):
     data,rows,source,database=seed

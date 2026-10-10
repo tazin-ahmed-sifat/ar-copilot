@@ -1,12 +1,10 @@
-"""Bounded retries for Gemini calls, and a safe classification of provider errors.
+"""Bounded retries for local Ollama calls, and a safe classification of provider errors.
 
 Provider error bodies can contain request details, so they are read here only to
 pick a category and a retry delay; neither the body nor the message is ever stored.
 """
-import json
 import math
 import random
-import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,8 +12,6 @@ from email.utils import parsedate_to_datetime
 from typing import Callable
 
 RETRYABLE_CODES = (429, 408, 500, 502, 503, 504)
-# Errors where waiting a few seconds cannot help, so the run stops instead of retrying.
-STOP_KINDS = ('daily_quota_exhausted', 'zero_quota', 'credits_exhausted')
 
 
 def retry_after(value, now: datetime | None = None) -> float | None:
@@ -31,60 +27,22 @@ def retry_after(value, now: datetime | None = None) -> float | None:
 
 
 def error_metadata(exc: BaseException) -> dict:
-    """Return the HTTP code, an error category and the longest retry hint the provider gave."""
+    """Classify local HTTP failures without retaining response bodies or exception messages."""
     code = getattr(exc, 'code', None)
     code = code if isinstance(code, int) else None
-    body = getattr(exc, 'details', {})
-    body = body if isinstance(body, dict) else {}
-    error = body.get('error', body)
-    private_text = json.dumps(error).lower() + str(getattr(exc, 'message', '')).lower()
-    return dict(error_code=code, error_kind=_classify(code, private_text),
-                retry_after_seconds=_retry_delay(exc, error))
-
-
-def _retry_delay(exc: BaseException, error) -> float | None:
-    response = getattr(exc, 'response', None)
-    headers = getattr(response, 'headers', {}) or {}
-    delay = retry_after(headers.get('Retry-After') or headers.get('retry-after'))
-    details = error.get('details', []) if isinstance(error, dict) else []
-    for detail in details:
-        if isinstance(detail, dict) and 'RetryInfo' in detail.get('@type', ''):
-            hint = _retry_info_seconds(detail.get('retryDelay'))
-            if hint is not None:
-                delay = max(delay or 0, hint)
-    return delay
-
-
-def _retry_info_seconds(raw) -> float | None:
-    # Google sends RetryInfo.retryDelay either as "12s" or as {"seconds": 12, "nanos": 0}.
-    if isinstance(raw, str) and raw.endswith('s'):
-        return retry_after(raw[:-1])
-    if isinstance(raw, dict):
-        return retry_after(float(raw.get('seconds', 0)) + float(raw.get('nanos', 0)) / 1e9)
-    return None
-
-
-def _classify(code: int | None, private_text: str) -> str:
-    if code == 429:
-        if any(word in private_text for word in ('perday', 'per_day', 'daily', 'quota_exceeded')):
-            return 'daily_quota_exhausted'
-        if re.search(r'limit\s*[:=]\s*0\b|"quotavalue"\s*:\s*"?0\b', private_text):
-            return 'zero_quota'
-        return 'temporary_or_unknown_rate_limit'
-    if code == 402:
-        return 'credits_exhausted'
-    if code in (408, 500, 502, 503, 504):
-        return 'temporary_server_error'
-    return 'non_retryable_error'
+    headers = getattr(exc, 'headers', {}) or {}
+    return dict(error_code=code,
+                error_kind='temporary_server_error' if code in RETRYABLE_CODES else 'non_retryable_error',
+                retry_after_seconds=retry_after(headers.get('Retry-After')))
 
 
 @dataclass(frozen=True)
 class RetryPolicy:
-    max_attempts: int = 4    # including the first call
+    max_attempts: int = 1    # including the first call
     base_delay: float = 2
     max_delay: float = 30
     max_wait: float = 120    # total backoff per document; pacing between documents is separate
-    pace: float = 12         # minimum seconds between request starts
+    pace: float = 0         # minimum seconds between request starts
 
     def __post_init__(self):
         if self.max_attempts < 1 or self.max_attempts > 20:
@@ -118,9 +76,7 @@ def run_with_retry(call: Callable[[], dict], policy: RetryPolicy, sleep=time.sle
         if not result['error']:
             break
         stop = None
-        if result.get('error_kind') in STOP_KINDS:
-            stop = result['error_kind']
-        elif result.get('error_code') not in RETRYABLE_CODES:
+        if result.get('error_code') not in RETRYABLE_CODES:
             break
         elif number == policy.max_attempts:
             if result.get('error_code') == 429:

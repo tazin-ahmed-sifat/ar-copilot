@@ -12,7 +12,7 @@ if not __package__:
 import json
 
 from ar_copilot.config import ROOT
-from ar_copilot.timing import TIMINGS_PATH, load_timings, summarise
+from ar_copilot.timing import load_timings, summarise
 
 RESULTS = ROOT / 'results'
 
@@ -54,10 +54,9 @@ def _comparison(groups: dict) -> str:
 
 
 def main() -> None:
-    timings = load_timings(TIMINGS_PATH)
-    if not any(not t.practice for t in timings):
+    summary = summarise(load_timings())
+    if not summary['groups']:
         raise SystemExit('No timed documents in results/timings.csv yet; nothing written.')
-    summary = summarise(timings)
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / 'timing_summary.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
     (RESULTS / 'timing_summary.md').write_text(render_markdown(summary), encoding='utf-8')

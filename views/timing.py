@@ -9,8 +9,8 @@ import streamlit as st
 
 from ar_copilot.core import FIELDS
 from ar_copilot.extract import extract
-from ar_copilot.timing import (TIMINGS_PATH, Timing, append_timing, count_corrections,
-                               count_field_errors, load_timings, summarise)
+from ar_copilot.timing import (Timing, append_timing, count_corrections, count_field_errors, load_timings,
+                               summarise)
 from ar_copilot.ui import FIELD_LABELS, data_dir, show_pdf
 
 METHOD_LABELS = {'manual': 'Key by hand', 'assisted': 'Extract, review, approve'}
@@ -31,7 +31,7 @@ def load_truth(path: Path) -> dict[str, dict[str, str]]:
 
 def next_document(operator: str, method: str, truth: dict) -> str | None:
     """Random order, skipping documents this operator already timed with this method."""
-    done = {t.filename for t in load_timings(TIMINGS_PATH) if t.operator == operator and t.method == method and not t.practice}
+    done = {t.filename for t in load_timings() if t.operator == operator and t.method == method and not t.practice}
     remaining = sorted(set(truth) - done)
     return random.choice(remaining) if remaining else None
 
@@ -99,13 +99,13 @@ else:
                 filename=filename, seconds=round(seconds, 2), extraction_seconds=round(extraction['seconds'], 2),
                 fields_corrected=count_corrections(extraction['fields'], entered) if session['method'] == 'assisted' else 0,
                 field_errors=errors, decision=decision, practice=session['practice'],
-            ), TIMINGS_PATH)
+            ))
             st.session_state.pop('timing')
             st.toast(f'Saved {filename}: {seconds:.1f} s, {errors} field error{"s" * (errors != 1)}.')
             st.rerun()
 
 st.subheader('Recorded so far')
-summary = summarise(load_timings(TIMINGS_PATH))
+summary = summarise(load_timings())
 if not summary['groups']:
     st.caption('No timed documents yet. Practice a couple first, then time a full set with each method.')
 else:

@@ -47,8 +47,13 @@ class Store:
         return self.db.execute('SELECT id FROM documents WHERE hash=?', (digest,)).fetchone()[0]
 
     def documents(self) -> list[dict]:
-        rows = self.db.execute('SELECT * FROM documents ORDER BY id')
+        """Every document with its current fields; PDF bytes are left out (see pdf())."""
+        rows = self.db.execute('SELECT id, hash, filename, extraction, fields, status, posting_key, created_at '
+                               'FROM documents ORDER BY id')
         return [dict(row, **json.loads(row['fields'])) for row in rows]
+
+    def pdf(self, document_id: int) -> bytes:
+        return self.db.execute('SELECT pdf FROM documents WHERE id=?', (document_id,)).fetchone()[0]
 
     def review(self, document_id: int, fields: dict, action: str, actor: str, reason: str) -> None:
         if action not in STATUS_FOR_ACTION or not actor.strip() or not reason.strip():

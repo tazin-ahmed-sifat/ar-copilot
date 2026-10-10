@@ -8,11 +8,11 @@ import statistics
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-from .config import ROOT
+from . import config
 from .core import FIELDS
 
-TIMINGS_PATH = ROOT / 'results' / 'timings.csv'
-METHODS = ('manual', 'assisted')
+def timings_path() -> Path:
+    return config.ROOT / 'results' / 'timings.csv'
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,8 @@ def count_corrections(extracted: dict[str, str | None], final: dict[str, str]) -
     return sum((extracted.get(f) or '') != (final.get(f) or '') for f in FIELDS)
 
 
-def append_timing(timing: Timing, path: Path = TIMINGS_PATH) -> None:
+def append_timing(timing: Timing, path: Path | None = None) -> None:
+    path = path or timings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     is_new = not path.exists() or path.stat().st_size == 0
     with path.open('a', newline='', encoding='utf-8') as handle:
@@ -52,7 +53,8 @@ def append_timing(timing: Timing, path: Path = TIMINGS_PATH) -> None:
         writer.writerow(asdict(timing))
 
 
-def load_timings(path: Path = TIMINGS_PATH) -> list[Timing]:
+def load_timings(path: Path | None = None) -> list[Timing]:
+    path = path or timings_path()
     if not path.exists():
         return []
     with path.open(newline='', encoding='utf-8') as handle:

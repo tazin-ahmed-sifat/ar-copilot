@@ -94,9 +94,10 @@ excluded(records, payments)
 st.subheader('Download')
 st.caption(f'Workbooks are snapshots as at {reporting_date:%d %B %Y}.')
 left, right = st.columns(2)
-left.download_button('Aged debt workbook', workbook(records, debt, reporting_date, 'debt', payments),
+left.download_button('Aged debt workbook', lambda: workbook(records, debt, reporting_date, 'debt', payments),
                      f'ar_debt_{reporting_date.isoformat()}.xlsx', XLSX, width='stretch')
-right.download_button('Posted register for Power Automate', workbook(records, debt, reporting_date, 'posted', payments),
+right.download_button('Posted register for Power Automate',
+                      lambda: workbook(records, debt, reporting_date, 'posted', payments),
                       f'ar_posted_{reporting_date.isoformat()}.xlsx', XLSX, width='stretch')
 with st.expander(f'Payment ledger ({len(payments)})'):
     st.dataframe(payments, hide_index=True, width='stretch')

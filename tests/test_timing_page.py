@@ -14,7 +14,6 @@ PAGE = str(config.ROOT / 'views' / 'timing.py')
 def isolated(tmp_path, monkeypatch):
     generate(tmp_path / 'data')
     monkeypatch.setattr(config, 'ROOT', tmp_path)
-    monkeypatch.setattr(timing, 'TIMINGS_PATH', tmp_path / 'results' / 'timings.csv')
     return tmp_path
 
 

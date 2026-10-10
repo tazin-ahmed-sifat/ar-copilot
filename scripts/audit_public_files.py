@@ -19,7 +19,7 @@ def audit():
     candidates = [ROOT/p for p in PUBLIC_FILES]
     for directory in PUBLIC_DIRECTORIES:
         candidates.extend(path for path in (ROOT/directory).rglob('*') if path.is_file()
-                          and path.suffix in ('.py','.md','.json','.toml','.pq','.csv','.xlsx','.png') and '__pycache__' not in path.parts
+                          and '__pycache__' not in path.parts
                           and path.name != 'secrets.toml')
     candidates=sorted(set(candidates))
     key,_=gemini_settings()

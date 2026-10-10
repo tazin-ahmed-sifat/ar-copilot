@@ -54,7 +54,7 @@ def test_complete_demo_import_review_export(isolated_app, monkeypatch):
     captured = {}
     native_download = DeltaGenerator.download_button
     def capture(self, label, data, *args, **kwargs):
-        captured[label] = data
+        captured[label] = data() if callable(data) else data
         return native_download(self, label, data, *args, **kwargs)
     monkeypatch.setattr(DeltaGenerator, 'download_button', capture)
     app.run()

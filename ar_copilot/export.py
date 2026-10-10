@@ -65,8 +65,6 @@ def workbook(records: list[dict], debt: list[dict], reporting_date: date, kind: 
         'default_format_properties': {'font_name': FONT, 'font_size': 10},
     })
     formats = _Formats(book)
-    unresolved = [dict(id=r['id'], filename=r['filename'], status=r['status'])
-                  for r in records if r['status'] != 'approved']
     if kind == 'debt':
         # Created first so it opens on top; it holds no Excel table, so table numbering is unchanged.
         summary = book.add_worksheet('Summary')
@@ -77,6 +75,8 @@ def workbook(records: list[dict], debt: list[dict], reporting_date: date, kind: 
         typed_payments = [dict(p, payment_date=parse_date(p['payment_date']), amount=Decimal(p['amount']))
                           for p in payments]
         _write_table(book, formats, 'Payments', typed_payments, PAYMENT_COLUMNS)
+        unresolved = [dict(id=r['id'], filename=r['filename'], status=r['status'])
+                      for r in records if r['status'] != 'approved']
         _write_table(book, formats, 'Unresolved', unresolved, ['id', 'filename', 'status'])
         _write_summary(book, summary, formats, debt, reporting_date, len(unresolved))
     _write_readme(book, formats, reporting_date)
@@ -155,10 +155,10 @@ def _write_summary(book, sheet, formats: _Formats, debt: list[dict], reporting_d
     for offset, customer in enumerate(customers):
         row = first_row + offset
         sheet.write(row, 0, customer)
+        criterion = xl_rowcol_to_cell(row, 0, col_abs=True)
         for index, bucket in enumerate(BUCKETS):
             column = xl_col_to_name(DEBT_COLUMNS.index(bucket))
             cached = sum((r[bucket] for r in debt if r['customer'] == customer), Decimal('0'))
-            criterion = xl_rowcol_to_cell(row, 0, col_abs=True)
             sheet.write_formula(row, index + 1,
                                 f'=SUMIF({customer_range},{criterion},AgedDebt!${column}$2:${column}${last_debt_row})',
                                 formats.money, float(cached))
@@ -178,14 +178,15 @@ def _write_summary(book, sheet, formats: _Formats, debt: list[dict], reporting_d
     sheet.write(total_row + 2, 0, 'Documents excluded (in review or rejected)', formats.label)
     sheet.write_formula(total_row + 2, 1, f'=COUNTA(Unresolved!$B$2:$B${max(unresolved_count, 1) + 1})',
                         None, unresolved_count)
-    _insert_bucket_chart(book, sheet, first_row, total_row - 1, total_row + 4)
+    _insert_bucket_chart(book, sheet, header_row, total_row - 1, total_row + 4)
 
 
-def _insert_bucket_chart(book, sheet, first_row: int, last_row: int, anchor_row: int) -> None:
+def _insert_bucket_chart(book, sheet, header_row: int, last_row: int, anchor_row: int) -> None:
     chart = book.add_chart({'type': 'bar', 'subtype': 'stacked'})
+    first_row = header_row + 1
     for index, label in enumerate(BUCKET_LABELS):
         chart.add_series({
-            'name': ['Summary', 4, index + 1],
+            'name': ['Summary', header_row, index + 1],
             'categories': ['Summary', first_row, 0, last_row, 0],
             'values': ['Summary', first_row, index + 1, last_row, index + 1],
             'fill': {'color': BUCKET_COLOURS[index]},

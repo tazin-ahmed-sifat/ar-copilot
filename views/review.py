@@ -23,7 +23,7 @@ def queue_table(rows: list[dict]):
         'Checks': _checks_label(r),
         'Status': STAMPS[r['status']][0],
     } for r in rows])
-    colours = {label: colour for label, colour in STAMPS.values()}
+    colours = dict(STAMPS.values())
     return frame.style.map(lambda v: f'color: {colours[v]}; font-weight: 600', subset=['Status'])
 
 
@@ -79,7 +79,7 @@ def review_form(record: dict, extraction: dict) -> tuple[str | None, dict, str, 
                                  key=f'{record["id"]}-reviewer', disabled=locked)
         reason = st.text_input('Reason', key=f'{record["id"]}-reason', disabled=locked,
                                placeholder='For example: checked against the PDF')
-        approve, save, reject = st.columns([1, 1, 1])
+        approve, save, reject = st.columns(3)
         clicked = {
             'approve': approve.form_submit_button('Approve', type='primary', disabled=locked, width='stretch'),
             'save': save.form_submit_button('Save changes', disabled=locked, width='stretch'),
@@ -152,8 +152,9 @@ st.caption(f"{record['filename']}, extracted from {source} in {extraction['secon
 
 pdf_column, form_column = st.columns([1, 1], gap='large')
 with pdf_column:
-    show_pdf(record['pdf'], record['filename'])
-    st.download_button('Download PDF', record['pdf'], record['filename'], 'application/pdf')
+    pdf = store.pdf(record['id'])
+    show_pdf(pdf, record['filename'])
+    st.download_button('Download PDF', pdf, record['filename'], 'application/pdf')
 with form_column:
     show_checks(record, extraction)
     action, fields, reviewer, reason = review_form(record, extraction)

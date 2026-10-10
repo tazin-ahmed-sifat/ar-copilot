@@ -3,6 +3,8 @@
 Start with `python -m streamlit run app.py`. The sidebar loads documents and payments;
 the pages live in views/.
 """
+import hashlib
+
 import streamlit as st
 
 from ar_copilot.extract import extract
@@ -40,14 +42,14 @@ def extract_uploads(store: Store, uploads, mode: str) -> None:
         if len(pdf) > MAX_PDF_BYTES:
             st.sidebar.error(f'{upload.name} is over 10 MB.')
             continue
-        before = len(known)
-        document_id = store.ingest(upload.name, pdf, extract(pdf, mode, data_dir() / 'demo_fixtures.json'))
-        known = {r['hash'] for r in store.documents()}
-        if len(known) == before:
+        digest = hashlib.sha256(pdf).hexdigest()
+        if digest in known:
             st.sidebar.info(f'{upload.name} is already in the queue.')
-        else:
-            st.sidebar.success(f'{upload.name} added to the review queue.')
-            st.session_state['selected_document'] = document_id
+            continue
+        document_id = store.ingest(upload.name, pdf, extract(pdf, mode, data_dir() / 'demo_fixtures.json'))
+        known.add(digest)
+        st.sidebar.success(f'{upload.name} added to the review queue.')
+        st.session_state['selected_document'] = document_id
 
 
 def import_payments(store: Store, ledger) -> None:

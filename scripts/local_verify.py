@@ -10,7 +10,6 @@ if not __package__:
 import csv
 import io
 import json
-from datetime import date
 from decimal import Decimal
 import pymupdf as fitz
 from PIL import Image, ImageDraw

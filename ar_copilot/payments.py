@@ -1,10 +1,11 @@
-"""Parse uploaded ledgers before a transactional import."""
+"""Parse an uploaded payment ledger CSV into rows for Store.import_payments."""
 import csv
 import io
 
 PAYMENT_FIELDS = ['payment_id', 'invoice_number', 'customer', 'payment_date', 'amount']
 
-def parse_payment_csv(content):
+def parse_payment_csv(content: bytes) -> list[dict]:
+    """Reject malformed files up front so a bad upload never half-imports."""
     try:
         text = content.decode('utf-8-sig')
     except UnicodeDecodeError as exc:

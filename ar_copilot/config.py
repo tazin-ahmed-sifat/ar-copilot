@@ -1,4 +1,4 @@
-"""Workspace-local configuration; status checks never expose credentials."""
+"""Gemini settings from the environment or the workspace .env file. The key is never displayed."""
 import os
 from pathlib import Path
 from dotenv import dotenv_values
@@ -10,14 +10,16 @@ ENV_PATH = ROOT / '.env'
 # project; gemini-3.8-flash is the model the measured runs used.
 DEFAULT_MODEL = 'gemini-3.8-flash'
 
-def gemini_settings():
-    # Read on each extraction so a key saved while Streamlit is running is seen.
-    # Explicit process environment variables take precedence over .env.
+def gemini_settings() -> tuple[str, str]:
+    """Return (key, model). Re-read on every call so a key saved while the app runs is picked up.
+
+    Process environment variables win over .env, so a one-off override needs no file edit.
+    """
     local = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
     key = (os.getenv('GEMINI_API_KEY') or local.get('GEMINI_API_KEY') or '').strip()
     model = (os.getenv('GEMINI_MODEL') or local.get('GEMINI_MODEL') or DEFAULT_MODEL).strip()
     return key, model
 
-def configuration_status():
+def configuration_status() -> dict:
     key, model = gemini_settings()
     return {'env_file_exists': ENV_PATH.exists(), 'key_configured': bool(key), 'model': model}

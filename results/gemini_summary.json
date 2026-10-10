@@ -1,5 +1,5 @@
 {
-  "source_run": "20261010T172639466799Z",
+  "source_run": "20261010T210614833398Z",
   "sample": "full",
   "models": [
     "gemini-3.8-flash"
@@ -13,7 +13,34 @@
     "failures_by_http_status": {
       "429": 34,
       "503": 2
+    },
+    "failures_by_kind": {
+      "daily_quota_exhausted": 1,
+      "legacy_unclassified": 35
     }
+  },
+  "extraction_mistakes": {
+    "completed_documents_with_mismatches": 0,
+    "incorrect_fields_on_completed": 0
+  },
+  "credit_notes": {
+    "documents": 1,
+    "completed": 0,
+    "exact_documents": 0,
+    "unassessed": 1
+  },
+  "processing_seconds": {
+    "new_request_seconds": 120.36184380000486,
+    "new_retry_wait_seconds": 5.020906859330845,
+    "new_pacing_wait_seconds": 0.0,
+    "invocation_seconds": 125.41438909999852,
+    "cumulative_observed_seconds": 172.80131935933653
+  },
+  "resume": {
+    "state": "stopped_with_failures_or_pending",
+    "stop_reason": "daily_quota_exhausted",
+    "attempted_this_run": 1,
+    "successful_calls_reused": 4
   },
   "counts": {
     "correct_fields": 48,

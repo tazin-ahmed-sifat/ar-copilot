@@ -93,12 +93,23 @@ Extraction was measured on 10 October 2026 with `gemini-3.8-flash`, scoring exac
 | API returned a result | 4/40 (10%): 34 × HTTP 429, 2 × HTTP 503 | 3/3 |
 | Field accuracy on completed documents | 48/48 (100%) | 36/36 (100%) |
 | Field accuracy overall, failures counted as wrong | 48/480 (10%) | 36/36 (100%) |
+| Document accuracy, completed / overall | 4/4 (100%) / 4/40 (10%) | 3/3 (100%) / 3/3 (100%) |
 | Intentional anomalies caught by rules | 0/2: both calls failed, so neither was assessed | none in sample |
+| Rule false positives on completed documents | 0 | 0 |
+| Credit notes completed | 0/1: unassessed due to API failure | none in sample |
 | Median latency, completed documents | 5.95 s (n=4) | 5.05 s (n=3) |
 
 Every document goes to the review queue whatever happens, so the failures held nothing up unchecked. The
 four completed documents cover all three layouts, but rate limits stopped the run before it reached the two
 anomalies and the credit note.
+
+The latest paced resume preserved the four successful extractions and retried one failed document.
+Two HTTP 504 timeouts were followed by HTTP 429 classified as `daily_quota_exhausted`; the evaluator
+checkpointed and stopped immediately. Request processing took 120.362 s, retry waits 5.021 s and
+elapsed time 125.414 s. These are API failures; the completed documents have zero extraction
+mismatches. The table counts each document's latest outcome, so the temporary 504 attempts are
+not additional failed documents. The demo database, review decisions and original reports were
+unchanged. Offline fixtures remain separate from these live results.
 
 **Time saved has not been measured yet.** The *Time a document* page records it, and
 `python scripts/summarize_timings.py` writes `results/timing_summary.md` once real timings exist.

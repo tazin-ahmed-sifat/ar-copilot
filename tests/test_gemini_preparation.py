@@ -21,6 +21,15 @@ def test_workspace_dotenv_and_environment_precedence(tmp_path, monkeypatch):
     monkeypatch.setenv('GEMINI_API_KEY','PROCESS_FAKE_VALUE')
     assert config.gemini_settings()[0] == 'PROCESS_FAKE_VALUE'
 
+def test_default_model_is_defined_once_and_matches_env_example(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, 'ENV_PATH', tmp_path/'missing.env')
+    monkeypatch.delenv('GEMINI_MODEL', raising=False)
+    assert config.gemini_settings()[1] == config.DEFAULT_MODEL
+    example = (config.ROOT/'.env.example').read_text().splitlines()
+    assert f'GEMINI_MODEL={config.DEFAULT_MODEL}' in example
+    # gemini-2.5-flash is listed for this account but returned HTTP 404 in the smoke test.
+    assert config.DEFAULT_MODEL != 'gemini-2.5-flash'
+
 def test_dotenv_is_ignored_by_git(tmp_path):
     # This workspace need not be a Git repo; validate its real ignore rules
     # inside an isolated temporary repo without initializing the user's repo.

@@ -37,3 +37,15 @@ def test_public_summary_keeps_metrics_apart_and_drops_document_content():
     assert summary['accuracy_overall']['field'] == 0.5
     assert summary['latency_seconds_completed'] == dict(n=2, median=3.0, min=2.0, max=4.0)
     assert 'SECRET' not in json.dumps(summary)
+
+def test_markdown_table_shows_counts_for_each_denominator():
+    from scripts.publish_results import public_summary, render_markdown
+    def row(filename, error):
+        return dict(filename=filename, model='mock', error=error, error_code=503 if error else None,
+                    seconds=1.0, validation=[], matches={f: not error for f in FIELDS})
+    summary = public_summary(dict(run_id='mock', details=[row('a.pdf', None), row('b.pdf', 'mock API error')]), {})
+    table = render_markdown(summary)
+    assert '| Completion rate (API returned a result) | 1/2 (50.0%) |' in table
+    assert '| Field accuracy on completed documents | 12/12 (100.0%) |' in table
+    assert '| Field accuracy overall (failures count as wrong) | 12/24 (50.0%) |' in table
+    assert '1 × HTTP 503' in table

@@ -18,3 +18,11 @@ Use --max-attempts, --base-delay, --max-delay and --max-wait to configure bounde
 The local one-document retry on 10 October 2026 returned HTTP 429 classified as daily_quota_exhausted. The evaluator stopped after one request without further retries. Four prior successes were reused: completion 4/40 (10%), completed field/document accuracy 100%, overall field/document accuracy 10%. Both anomalies remain unassessed. The retry took 0.856 seconds of request processing. The demo database was unchanged. The original report was preserved; the new checkpoint remains local under ignored reports/gemini.
 
 Next step: in Google AI Studio's project/model rate-limit view, confirm the gemini-3.8-flash daily quota has reset and is nonzero, then resume the local checkpoint. If the allowance is zero or still exhausted, wait for the shown reset or use an already-authorized model with available free quota after a separate smoke test. Do not enable billing or purchase quota as part of this workflow.
+
+After a paced or resumed run finishes, refresh the committed results from its checkpoint:
+
+```
+python scripts/publish_results.py reports/gemini/resilient_<run-id>.json
+```
+
+This rewrites `results/gemini_summary.json` and the table in `results/gemini_summary.md`. Completion rate, accuracy on completed documents and overall accuracy are reported separately; commit both files together.

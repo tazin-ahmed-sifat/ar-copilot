@@ -1,6 +1,6 @@
 # Live Gemini smoke test — 10 October 2026
 
-Three actual API extractions succeeded using **gemini-3.8-flash**. The configured default gemini-2.5-flash returned HTTP 404 for all three documents; a model-list query nevertheless advertised it. This run does not establish why that listed model failed. No key values or provider exception bodies were printed. `.env` was not changed; the successful model was a command-line override for an isolated process.
+Three actual API extractions succeeded using **gemini-3.8-flash**. The then-default gemini-2.5-flash returned HTTP 404 for all three documents; a model-list query nevertheless advertised it. This run does not establish why that listed model failed. No key values or provider exception bodies were printed. `.env` was not changed; the successful model was a command-line override for an isolated process.
 
 The metrics are committed in [results/gemini_smoke_summary.md](../results/gemini_smoke_summary.md); the raw report with extracted values stays local. All 36 field comparisons matched (100% exact field accuracy); all three documents matched in full (100% document accuracy). There were zero extraction errors and zero validation failures/false positives. These three clean invoices contain no intentional anomalies, so anomaly detection and credit-note extraction remain untested with Gemini.
 

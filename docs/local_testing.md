@@ -1,17 +1,48 @@
-# Local verification
+# Local QA
 
-The suite checks PDF-byte reproducibility, all printed truth values, 40 documents/three layouts, exact demo fixtures, the two intentional anomalies, invalid/nonfinite/sub-penny money, invalid dates, VAT and signs, source/business duplicate prevention and transaction rollback, payment replay/conflict, missing-field approval prevention, unresolved credit prevention, linked credit allocation, corrections/audit history, all aging boundaries, future transactions and unresolved exclusions, real Excel tables and formula injection prevention, extraction errors, and Streamlit load/review/approval interactions.
+## Tests
 
-Run `python -m pytest -q`. Run `python -m scripts.local_verify` for an isolated in-memory QA workflow and example workbook snapshots in `output/`. QA approvals are explicitly automated fixture decisions and do not change `runtime/ar.sqlite`. The isolated workflow approves 38 valid documents, leaves two anomalies unresolved, and produces 37 invoice balances after one allocated credit. PDF contact sheets are retained in `tmp/qa` for inspection.
+```
+python -m pytest -q
+```
 
-The offline evaluator recorded actual processing durations and detected both intentional anomalies with zero missed anomalies and zero false positives in this corpus. Perfect fixture agreement is expected by construction and is **not Gemini accuracy**. See `reports/evaluation_demo.json` for raw details. No manual-entry timings or Gemini timings have been measured. A local Streamlit server health request returned HTTP 200. Gemini request configuration was constructed using the installed official SDK, but no credentialed call was made. Microsoft 365 has no configured connections and no messages were sent.
+The suite runs offline against temporary copies of the fictional dataset and never touches
+`runtime/ar.sqlite`. It covers:
 
-Example Excel files were verified as valid ZIP-based OOXML workbooks with named tables and numeric/date cell types by local checks. They have not been opened in Microsoft Excel or tested with Power Automate. Tenant integration verification remains pending.
+- **Corpus:** byte-reproducible PDFs, printed ground truth, the two intentional anomalies and the credit note.
+- **Rules:** required fields, dates, VAT, signs, malformed or sub-penny amounts, and every aging bucket boundary.
+- **Storage:** duplicate prevention by file hash and by business key, rollback on a bad decision or payment row,
+  locked approvals, credit allocation and the decision history.
+- **Exports:** real Excel tables, typed cells, formula-injection safety, empty-table templates, and Summary formulas
+  that trace back to AgedDebt.
+- **Evaluation:** strict scoring, failed calls kept apart from rule detections, retries, quota stops, checkpoints and resume.
+- **App:** the review, payment and download flow and the timing page, driven through Streamlit's AppTest.
+  AppTest can't open a native file chooser, so uploads are supplied at the uploader call.
+- **Excel fixture:** the Python aging rules against the hand-computed answer in `excel/fixture/`.
 
-## Screenshot follow-up verification (10 October 2026)
+## End-to-end check without the UI
 
-Fixed the upload-limit mismatch (10 MB PDF / 2 MB ledger), missing-demo silent success, CSV validation/invalid-Decimal crashes, empty ledger false success, and missing named tables on empty exports. File paths now resolve relative to app.py so launching outside the workspace does not open a different database. Review inputs have document-specific keys; PDF preview rendering is cached and has accessible names. Payment import reports actual new counts and validates every row before the transaction commits; all rows roll back on a bad entry.
+```
+python scripts/local_verify.py
+```
 
-The expanded suite has 26 cases. It loads the demo twice (40 records), supplies uploaded CSV bytes at the public sidebar uploader boundary (AppTest cannot drive a native file chooser), imports 26 payments twice (26 unique payments), approves a valid invoice, blocks a missing-PO approval, saves a documented test correction, rejects inconsistent totals, switches invoices without carrying fields across, and inspects the actual Excel bytes passed to both download buttons. It checks numeric/date cells, posted row counts, payment-adjusted balances, named tables on empty exports, malformed CSV handling and rollback. All test decisions occur in temporary databases; saved user approvals are preserved.
+This builds an in-memory database from the demo PDFs, approves every document that passes
+validation (marked as an automated fixture decision), imports the demo ledger and writes example
+workbooks to `output/`. It should report 38 approved documents, 2 unresolved and 37 aged-debt
+rows. PDF contact sheets go to `tmp/qa/`.
 
-The user's running localhost:8501 server returned HTTP 200. No connected browser was available, so actual browser upload selection and download-to-disk clicks remain unverified. The provided screenshot shows a loaded invoice with no visible exception; disabled import/process buttons before file selection are expected. Gemini and Microsoft 365 remain unverified/unconfigured.
+## Offline evaluation
+
+```
+python -m ar_copilot.evaluate --mode demo
+```
+
+Fixtures were built from the ground truth, so a perfect score is expected and proves only that
+extraction, scoring and validation are wired together. It is not Gemini accuracy and is never
+reported as such.
+
+## Not covered locally
+
+- Opening the exported workbooks in Excel and running the Power Query: see [excel/README.md](../excel/README.md).
+- Anything in Microsoft 365: see [the build guide](microsoft365.md).
+- Browser-level upload and download clicks.

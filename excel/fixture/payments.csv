@@ -1,0 +1,6 @@
+payment_id,invoice_number,customer,payment_date,amount
+FXP-1,FX-02,Alder Motors Ltd,2026-10-01,40.00
+FXP-2,FX-03,Alder Motors Ltd,2026-10-05,360.00
+FXP-3,FX-04,Alder Motors Ltd,2026-10-11,100.00
+FXP-4,FX-07,Beacon Vehicle Works Ltd,2026-09-30,840.00
+FXP-5,FX-08,Alder Motors Ltd,2026-08-01,1000.00

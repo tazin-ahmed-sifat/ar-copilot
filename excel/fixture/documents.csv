@@ -1,0 +1,14 @@
+document_type,supplier,customer,document_number,invoice_date,due_date,po_number,currency,net,vat,total,linked_invoice,status
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-01,2026-09-10,2026-10-10,PO-FX01,GBP,100.00,20.00,120.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-02,2026-09-09,2026-10-09,PO-FX02,GBP,200.00,40.00,240.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-03,2026-08-11,2026-09-10,PO-FX03,GBP,300.00,60.00,360.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-04,2026-08-10,2026-09-09,PO-FX04,GBP,400.00,80.00,480.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-05,2026-07-12,2026-08-11,PO-FX05,GBP,500.00,100.00,600.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-06,2026-07-11,2026-08-10,PO-FX06,GBP,600.00,120.00,720.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-07,2026-06-12,2026-07-12,PO-FX07,GBP,700.00,140.00,840.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-08,2026-06-11,2026-07-11,PO-FX08,GBP,800.00,160.00,960.00,,approved
+invoice,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-09,2026-10-11,2026-11-10,PO-FX09,GBP,100.00,20.00,120.00,,approved
+invoice,Northbridge Auto Components Ltd,Beacon Vehicle Works Ltd,FX-10,2026-09-20,2026-10-20,PO-FX10,GBP,1000.00,200.00,1200.00,,approved
+credit_note,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-C1,2026-09-01,2026-09-01,,GBP,-100.00,-20.00,-120.00,FX-05,approved
+credit_note,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-C2,2026-10-12,2026-10-12,,GBP,-200.00,-40.00,-240.00,FX-06,approved
+credit_note,Northbridge Auto Components Ltd,Alder Motors Ltd,FX-C3,2026-09-15,2026-09-15,,GBP,-100.00,-20.00,-120.00,FX-10,approved

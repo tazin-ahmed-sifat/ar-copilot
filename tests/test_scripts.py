@@ -6,7 +6,7 @@ import pytest
 
 from ar_copilot.config import ROOT
 
-SCRIPTS = ['audit_public_files', 'local_verify', 'publish_results', 'summarize_evaluation', 'summarize_timings']
+SCRIPTS = ['audit_public_files', 'build_excel_fixture', 'local_verify', 'publish_results', 'summarize_evaluation', 'summarize_timings']
 
 
 @pytest.mark.parametrize('name', SCRIPTS)

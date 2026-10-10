@@ -12,14 +12,14 @@ import re
 import subprocess
 from ar_copilot.config import ROOT, gemini_settings
 
-PUBLIC_DIRECTORIES = ['ar_copilot', 'pages', 'tests', 'scripts', 'docs', 'results', '.vscode', '.streamlit']
+PUBLIC_DIRECTORIES = ['ar_copilot', 'excel', 'pages', 'tests', 'scripts', 'docs', 'results', '.vscode', '.streamlit']
 PUBLIC_FILES = ['app.py', 'README.md', 'requirements.txt', 'requirements.lock.txt', '.gitignore', '.env.example']
 
 def audit():
     candidates = [ROOT/p for p in PUBLIC_FILES]
     for directory in PUBLIC_DIRECTORIES:
         candidates.extend(path for path in (ROOT/directory).rglob('*') if path.is_file()
-                          and path.suffix in ('.py','.md','.json','.toml') and '__pycache__' not in path.parts
+                          and path.suffix in ('.py','.md','.json','.toml','.pq','.csv','.xlsx') and '__pycache__' not in path.parts
                           and path.name != 'secrets.toml')
     candidates=sorted(set(candidates))
     key,_=gemini_settings()

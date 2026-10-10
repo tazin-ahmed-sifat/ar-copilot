@@ -8,4 +8,4 @@ Before each push, inspect `git diff --cached --stat` and confirm `git check-igno
 
 Raw reports stay local. The README cites only the metrics-only files in `results/`, which are regenerated from those reports by the scripts in `scripts/`.
 
-The release audit found a historical `.agents/skills/developing-with-streamlit` symlink containing a local filesystem path. It is absent from the current tree and ignored for future commits, but remains in history. See [release review](release_review.md) before publishing; no history has been rewritten.
+The release audit found a historical `.agents/skills/developing-with-streamlit` symlink containing a local filesystem path. Following user approval, that exact path was removed from all local Git history with git-filter-repo. A complete pre-rewrite Git backup remains private under ignored runtime/. The post-rewrite audit found no remaining symlink or private/raw-data paths. See [release review](release_review.md) for scope and limitations.

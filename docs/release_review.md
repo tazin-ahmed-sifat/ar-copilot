@@ -17,7 +17,7 @@ Those cloud safeguards have not been installed or verified in this review. Keep 
 no recurring schedule was enabled and no additional email was sent.
 SharePoint and Teams are an unbuilt extension; account creation restrictions remain.
 
-## Publication audit
+## Publication audit before cleanup
 
 The audit scanned 35 commits reachable through refs or reflogs, 190 unique historical blobs and
 both historical compressed Excel blobs, including their decompressed members. It also scanned
@@ -28,19 +28,32 @@ The committed workbook fixture and screenshots contain fictional demonstration d
 Pattern matching cannot prove that every possible credential format or sensitive value is absent.
 Local `.env` contents and discovered values were never displayed.
 
-Affected historical path: `.agents/skills/developing-with-streamlit` was a symlink whose target
+At the initial review, the affected historical path was: `.agents/skills/developing-with-streamlit` was a symlink whose target
 contains a local filesystem path. The current tree no longer tracks it; `.agents/` and `.codex/`
 are ignored. Deleting it in a later commit does not remove historical exposure.
 
-Before public release, decide whether to remove that path from every historical ref. A suitable
+The initial recommendation was to remove that path from every historical ref. A suitable
 remediation is a backed-up, separately reviewed `git filter-repo` operation removing the exact
 path, followed by another audit and coordination with any existing clones. This changes commit
-identifiers and may require remote-history replacement. No history rewrite, push or deployment
-was performed. If a credential is found in a later audit, revoke it before removing its history.
+identifiers and may require remote-history replacement. At that stage no history rewrite, push or deployment
+was performed; the subsequently authorized cleanup is recorded below. If a credential is found in a later audit, revoke it before removing its history.
+
+## Authorized history cleanup
+
+After the pre-cleanup findings were explained, the user authorized history removal. A full Git
+metadata backup was created under ignored `runtime/`; keep it private because it retains the
+original history. `git-filter-repo` removed only `.agents/skills/developing-with-streamlit`.
+Remote configuration was restored without displaying it. No push was performed.
+
+The post-rewrite audit scanned 37 commits, 202 unique blobs and two decompressed Excel blobs.
+It found no configured credential matches, common credential patterns, symlinks or private/raw
+report paths. Git fsck found no unreachable objects. All 87 checked current source and local
+evidence files were unchanged. Commit identifiers changed; public or shared remote history,
+if any, still needs a coordinated replacement. Do not merge the old history back into this copy.
 
 ## Verification and evidence gaps
 
-- 99 automated tests passed, including Streamlit AppTest, timing, evaluation, storage and exports.
+- 105 automated tests passed after cleanup, including Streamlit AppTest, timing, evaluation, storage and exports.
 - README local links and image paths were checked; Git whitespace checks passed.
 - Original reports, exported demonstration workbook and demo database were verified against
   the existing local preservation hashes.
@@ -57,7 +70,8 @@ was performed. If a credential is found in a later audit, revoke it before remov
 - [x] Review wording, safe aggregate evidence, tests and README paths.
 - [x] Preserve local financial records and raw evaluation evidence.
 - [x] Commit safe changes without pushing or deploying.
-- [ ] Decide and review historical symlink removal before public release.
+- [x] Remove the historical symlink after authorization and audit the rewritten history.
+- [ ] Coordinate remote history replacement if the old commits were already published.
 - [ ] Inspect the current app visually when browser access is available.
 - [ ] Verify cloud safeguards before any schedule; retain manual operation meanwhile.
 - [ ] Collect human measurements before publishing a timing result.

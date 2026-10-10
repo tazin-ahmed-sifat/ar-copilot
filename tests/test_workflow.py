@@ -3,6 +3,7 @@ import io
 import json
 import sqlite3
 import zipfile
+from pathlib import Path
 from tests.helpers import sheet_xml
 from datetime import date, timedelta
 from decimal import Decimal
@@ -127,23 +128,21 @@ def test_corrections_and_credit_allocation(corpus, tmp_path):
     assert len(debt) == 2
 
 def test_app_smoke(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+    from ar_copilot import config
     generate(tmp_path/'data')
-    import shutil
-    source = __import__('pathlib').Path(__file__).resolve().parents[1]/'app.py'
-    shutil.copyfile(source, tmp_path/'app.py')
-    app = AppTest.from_file(str(tmp_path/'app.py')).run(timeout=30)
+    monkeypatch.setattr(config, 'ROOT', tmp_path)
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py')).run(timeout=30)
     assert not app.exception
     next(b for b in app.button if b.label == 'Load 40 offline demo documents').click().run(timeout=30)
     assert not app.exception
-    assert len(Store().documents()) == 40
-    assert len(app.text_input) == 14
-    next(t for t in app.text_input if t.label == 'Reviewer name').set_value('Test reviewer')
-    next(t for t in app.text_input if t.label == 'Correction / decision reason').set_value('Verified fictional source')
-    next(s for s in app.selectbox if s.label == 'Action').select('approve')
-    next(b for b in app.button if b.label == 'Save decision').click().run(timeout=30)
+    store = Store(tmp_path/'runtime/ar.sqlite')
+    assert len(store.documents()) == 40
+    assert len(app.text_input) == 14  # twelve fields, reviewer and reason
+    next(t for t in app.text_input if t.label == 'Reviewer').set_value('Test reviewer')
+    next(t for t in app.text_input if t.label == 'Reason').set_value('Verified fictional source')
+    next(b for b in app.button if b.label == 'Approve').click().run(timeout=30)
     assert not app.exception
-    assert Store().documents()[0]['status'] == 'approved'
+    assert store.documents()[0]['status'] == 'approved'
 
 def test_summary_sheet_totals_are_traceable_formulas(corpus):
     from xml.etree import ElementTree as ET

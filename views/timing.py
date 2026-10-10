@@ -7,22 +7,19 @@ from pathlib import Path
 
 import streamlit as st
 
-from ar_copilot.config import ROOT
 from ar_copilot.core import FIELDS
 from ar_copilot.extract import extract
 from ar_copilot.timing import (TIMINGS_PATH, Timing, append_timing, count_corrections,
                                count_field_errors, load_timings, summarise)
-from ar_copilot.ui import apply_base_styles, show_pdf
+from ar_copilot.ui import FIELD_LABELS, data_dir, show_pdf
 
-DATA_DIR = ROOT / 'data'
 METHOD_LABELS = {'manual': 'Key by hand', 'assisted': 'Extract, review, approve'}
 MODE_LABELS = {'gemini': 'Gemini', 'demo': 'Offline fixtures'}
 
-apply_base_styles()
 st.title('Time a document')
 st.markdown(
     'Each document is timed from **Start** to **Finish**. Ground truth stays hidden until the row is saved, '
-    f'and only durations and error counts are written to `{TIMINGS_PATH.relative_to(ROOT).as_posix()}`.'
+    'and only durations and error counts are written to `results/timings.csv`.'
 )
 
 
@@ -39,6 +36,7 @@ def next_document(operator: str, method: str, truth: dict) -> str | None:
     return random.choice(remaining) if remaining else None
 
 
+DATA_DIR = data_dir()
 if not (DATA_DIR / 'ground_truth.csv').exists():
     st.error('The fictional dataset is missing. Run `python -m ar_copilot.generate`, then reload this page.')
     st.stop()
@@ -84,7 +82,7 @@ else:
         if extraction['error']:
             st.warning(f"Extraction failed ({extraction['error']}). Key the fields by hand; the clock is still running.")
         with st.form('timed-entry'):
-            entered = {f: st.text_input(f.replace('_', ' ').capitalize(), value=extraction['fields'].get(f) or '')
+            entered = {f: st.text_input(FIELD_LABELS[f], value=extraction['fields'].get(f) or '')
                        for f in FIELDS}
             decision = st.radio('Decision', ['accept', 'reject'], horizontal=True,
                                 format_func={'accept': 'Accept', 'reject': 'Reject (anomaly)'}.get)

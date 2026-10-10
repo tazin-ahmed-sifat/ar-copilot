@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 from ar_copilot import config, timing
 from ar_copilot.generate import generate
 
-PAGE = str(config.ROOT / 'pages' / 'timing.py')
+PAGE = str(config.ROOT / 'views' / 'timing.py')
 
 
 @pytest.fixture

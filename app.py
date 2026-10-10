@@ -1,117 +1,94 @@
-"""Run with: .venv/Scripts/python -m streamlit run app.py"""
-import json
-import sqlite3
-from datetime import date
-from pathlib import Path
-import pymupdf as fitz
+"""AR Copilot: review extracted invoices, age the approved debt, and time manual against assisted entry.
+
+Start with `python -m streamlit run app.py`. The sidebar loads documents and payments;
+the pages live in views/.
+"""
 import streamlit as st
-from ar_copilot.core import FIELDS, validate, aged_debt
+
 from ar_copilot.extract import extract
-from ar_copilot.store import Store
-from ar_copilot.export import workbook
 from ar_copilot.payments import parse_payment_csv
+from ar_copilot.store import Store
+from ar_copilot.ui import apply_base_styles, data_dir, open_store
 
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / 'data'
+MAX_PDF_BYTES = 10 * 1024 * 1024
+DEMO_DOCUMENTS = 40
+MODES = {'demo': 'Offline fixtures', 'gemini': 'Gemini'}
 
-@st.cache_data(max_entries=40)
-def preview_pages(pdf_bytes):
-    with fitz.open(stream=pdf_bytes, filetype='pdf') as pdf:
-        return [page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5)).tobytes('png') for page in pdf]
+st.set_page_config(page_title='AR Copilot', page_icon=':material/receipt_long:', layout='wide')
+apply_base_styles()
 
-st.set_page_config(page_title='AR Copilot', layout='wide')
-st.title('AR Copilot')
-st.caption('Northbridge Auto Components Ltd | FICTIONAL portfolio prototype | Microsoft 365: UNCONFIGURED')
-store = Store(BASE_DIR / 'runtime/ar.sqlite')
-mode = st.sidebar.selectbox('Extraction mode', ['demo', 'gemini'])
-if mode == 'demo':
-    st.warning('OFFLINE DEMO: exact generated fixtures, not measured Gemini extraction.')
-else:
-    st.info('Gemini mode sends extracted PDF text to Google when you click Process uploads.')
-uploads = st.file_uploader('Upload fictional invoice PDFs', type=['pdf'], accept_multiple_files=True, max_upload_size=10)
-if st.button('Process uploads', disabled=not uploads):
+
+def load_demo(store: Store) -> None:
+    folder = data_dir()
+    paths = sorted((folder / 'invoices').glob('*.pdf'))
+    if len(paths) != DEMO_DOCUMENTS or not (folder / 'demo_fixtures.json').exists():
+        st.sidebar.error('The demo dataset is missing. Run `python -m ar_copilot.generate`, then try again.')
+        return
+    before = len(store.documents())
+    for path in paths:
+        pdf = path.read_bytes()
+        store.ingest(path.name, pdf, extract(pdf, 'demo', folder / 'demo_fixtures.json'))
+    added = len(store.documents()) - before
+    st.session_state['flash'] = f'Loaded {added} new demo documents.' if added else 'Demo documents were already loaded.'
+    st.rerun()
+
+
+def extract_uploads(store: Store, uploads, mode: str) -> None:
+    known = {r['hash'] for r in store.documents()}
     for upload in uploads:
         pdf = upload.getvalue()
-        if len(pdf) > 10 * 1024 * 1024:
-            st.error('Maximum PDF size is 10 MB'); continue
-        existing = next((r for r in store.documents() if r['pdf'] == pdf), None)
-        if existing:
-            st.info(f'{upload.name}: already stored as record {existing["id"]}'); continue
-        result = extract(pdf, mode, DATA_DIR / 'demo_fixtures.json')
-        record_id = store.ingest(upload.name, pdf, result)
-        st.success(f'{upload.name}: record {record_id} awaits human review')
-if st.sidebar.button('Load 40 offline demo documents'):
-    paths = sorted((DATA_DIR / 'invoices').glob('*.pdf'))
-    if len(paths) != 40 or not (DATA_DIR / 'demo_fixtures.json').exists():
-        st.sidebar.error('Demo dataset missing or incomplete. Run python -m ar_copilot.generate.')
-    else:
-        before = len(store.documents())
-        for path in paths:
-            pdf = path.read_bytes()
-            store.ingest(path.name, pdf, extract(pdf, 'demo', DATA_DIR / 'demo_fixtures.json'))
-        st.session_state['demo_notice'] = f'Demo ready: {len(store.documents())-before} new documents; existing records preserved.'
-        st.rerun()
-if 'demo_notice' in st.session_state:
-    st.sidebar.success(st.session_state.pop('demo_notice'))
-payment_file = st.sidebar.file_uploader('Import payment ledger CSV', type='csv', max_upload_size=2)
-st.sidebar.caption('Choose data/payments.csv for the fictional demo ledger.')
-if st.sidebar.button('Import payments', disabled=payment_file is None):
+        if len(pdf) > MAX_PDF_BYTES:
+            st.sidebar.error(f'{upload.name} is over 10 MB.')
+            continue
+        before = len(known)
+        document_id = store.ingest(upload.name, pdf, extract(pdf, mode, data_dir() / 'demo_fixtures.json'))
+        known = {r['hash'] for r in store.documents()}
+        if len(known) == before:
+            st.sidebar.info(f'{upload.name} is already in the queue.')
+        else:
+            st.sidebar.success(f'{upload.name} added to the review queue.')
+            st.session_state['selected_document'] = document_id
+
+
+def import_payments(store: Store, ledger) -> None:
     try:
-        inserted = store.import_payments(parse_payment_csv(payment_file.getvalue()))
-        st.sidebar.success(f'{inserted} new payments imported; existing payment IDs skipped.')
+        rows = parse_payment_csv(ledger.getvalue())
+        inserted = store.import_payments(rows)
     except (ValueError, KeyError) as exc:
         st.sidebar.error(str(exc))
-records = store.documents()
-review_tab, debt_tab = st.tabs(['Document review', 'Aged debt and exports'])
-with review_tab:
-    if not records:
-        st.info('Upload documents or load the offline demo to begin.')
+        return
+    st.sidebar.success(f'{inserted} payments imported, {len(rows) - inserted} already on file.')
+
+
+store = open_store()
+navigation = st.navigation([
+    st.Page('views/review.py', title='Review queue', icon=':material/fact_check:', default=True),
+    st.Page('views/aged_debt.py', title='Aged debt', icon=':material/stacked_bar_chart:'),
+    st.Page('views/timing.py', title='Time a document', icon=':material/timer:'),
+])
+
+with st.sidebar:
+    st.subheader('Documents')
+    if st.button('Load 40 offline demo documents', width='stretch'):
+        load_demo(store)
+    mode = st.radio('Extract uploads with', list(MODES), format_func=MODES.get, horizontal=True)
+    if mode == 'demo':
+        st.caption('Fixtures replay the known answer for the generated demo PDFs. They are not Gemini results.')
     else:
-        selected = st.selectbox('Document', [r['id'] for r in records],
-                                format_func=lambda n: next(f'{r["filename"]} | {r["status"]}' for r in records if r['id']==n))
-        record = next(r for r in records if r['id'] == selected)
-        left, right = st.columns(2)
-        with left:
-            st.download_button('Download original PDF', record['pdf'], record['filename'], 'application/pdf')
-            try:
-                for number, image in enumerate(preview_pages(record['pdf']), start=1):
-                    st.image(image, width='stretch', alt=f'{record["filename"]}, source page {number}')
-            except Exception:
-                st.error('PDF preview unavailable; download the original.')
-        with right:
-            extraction = json.loads(record['extraction'])
-            st.caption(f'Origin: {extraction["mode"]} | Processing: {extraction["seconds"]:.3f} seconds')
-            if extraction['error']:
-                st.error(extraction['error'])
-            st.write('Independent validation:', validate(record) or 'Passed; human approval still required')
-            with st.expander('Original extracted text and fields'):
-                st.json(extraction['fields']); st.text(extraction['text'])
-            with st.form(f'review-{selected}'):
-                fields = {f: st.text_input(f, value=record.get(f) or '', key=f'{selected}-{f}', disabled=record['status']=='approved') for f in FIELDS}
-                actor = st.text_input('Reviewer name', key=f'{selected}-actor')
-                reason = st.text_input('Correction / decision reason', key=f'{selected}-reason')
-                action = st.selectbox('Action', ['save', 'approve', 'reject'], key=f'{selected}-action')
-                if st.form_submit_button('Save decision', disabled=record['status']=='approved'):
-                    try:
-                        store.review(selected, fields, action, actor, reason)
-                        st.rerun()
-                    except (ValueError, sqlite3.IntegrityError) as exc:
-                        st.error('Duplicate posting blocked' if isinstance(exc, sqlite3.IntegrityError) else str(exc))
-            st.dataframe(store.history(selected))
-with debt_tab:
-    reporting_date = st.date_input('Reporting date', date(2026, 10, 10))
-    debt = aged_debt(records, store.payments(), reporting_date)
-    st.dataframe(debt)
-    unresolved = [dict(id=r['id'], filename=r['filename'], status=r['status']) for r in records if r['status']!='approved']
-    st.write('Unresolved / rejected documents excluded from receivables')
-    st.dataframe(unresolved)
-    st.write('Payment ledger'); st.dataframe(store.payments())
-    approved_targets = {(r.get('customer'), r.get('document_number')) for r in records
-                        if r['status']=='approved' and r.get('document_type')=='invoice'}
-    unmatched = [p for p in store.payments() if (p['customer'],p['invoice_number']) not in approved_targets]
-    if unmatched:
-        st.warning('These payments have no approved matching invoice and are excluded from aged debt.')
-        st.dataframe(unmatched)
-    for kind, label in [('posted', 'Power Automate document table'), ('debt', 'Aged debt workbook')]:
-        st.download_button(label, workbook(records, debt, reporting_date, kind, store.payments()), f'ar_{kind}_{reporting_date.isoformat()}.xlsx',
-                           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        st.caption("Gemini receives each PDF's text when you press Extract.")
+    uploads = st.file_uploader('Invoice PDFs', type=['pdf'], accept_multiple_files=True, max_upload_size=10)
+    if st.button('Extract', disabled=not uploads, width='stretch'):
+        extract_uploads(store, uploads, mode)
+
+    st.subheader('Payments')
+    ledger = st.file_uploader('Import payment ledger CSV', type='csv', max_upload_size=2)
+    st.caption('The demo ledger is data/payments.csv.')
+    if st.button('Import payments', disabled=ledger is None, width='stretch'):
+        import_payments(store, ledger)
+
+    st.divider()
+    st.caption('Fictional data for Northbridge Auto Components Ltd. Microsoft 365 is not connected.')
+
+if 'flash' in st.session_state:
+    st.toast(st.session_state.pop('flash'))
+navigation.run()

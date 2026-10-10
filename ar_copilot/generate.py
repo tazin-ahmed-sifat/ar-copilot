@@ -15,13 +15,11 @@ from pathlib import Path
 from reportlab.lib.colors import HexColor
 from reportlab.pdfgen import canvas
 
-from .core import CUSTOMERS, DATE_FORMATS, FIELDS, SUPPLIER, parse_date
+from .core import CUSTOMERS, DATE_FORMATS, FIELD_LABELS, FIELDS, SUPPLIER, parse_date
 
 SEED = 20261010
 DOCUMENT_COUNT = 40
 PAGE_SIZE = (595, 842)  # A4 in points
-LABELS = dict(zip(FIELDS, ['Document type', 'Supplier', 'Customer', 'Document number', 'Invoice date',
-                           'Due date', 'PO number', 'Currency', 'Net', 'VAT', 'Total', 'Linked invoice']))
 LAYOUT_COLOURS = ['#17324D', '#315944', '#58354F']
 LAYOUT_TITLES = ['NORTHBRIDGE | INVOICE', 'NORTHBRIDGE | ACCOUNT STATEMENT', 'NORTHBRIDGE | BILLING NOTE']
 
@@ -111,14 +109,14 @@ def _draw_pdf(path: Path, record: dict, layout: int) -> None:
 def _draw_inline(pdf: canvas.Canvas, record: dict) -> None:
     for row, field in enumerate(FIELDS):
         pdf.setFont('Helvetica', 11)
-        pdf.drawString(40, 675 - row * 32, f'{LABELS[field]}: {record[field]}')
+        pdf.drawString(40, 675 - row * 32, f'{FIELD_LABELS[field]}: {record[field]}')
 
 
 def _draw_ruled(pdf: canvas.Canvas, record: dict) -> None:
     for row, field in enumerate(FIELDS):
         y = 675 - row * 32
         pdf.setFont('Helvetica-Bold', 10)
-        pdf.drawString(40, y, LABELS[field] + ':')
+        pdf.drawString(40, y, FIELD_LABELS[field] + ':')
         pdf.setFont('Helvetica', 11)
         pdf.drawString(190, y, record[field])
         pdf.line(40, y - 10, 555, y - 10)
@@ -128,7 +126,7 @@ def _draw_two_column(pdf: canvas.Canvas, record: dict) -> None:
     for position, field in enumerate(FIELDS):
         x, y = 40 + (position % 2) * 270, 675 - (position // 2) * 62
         pdf.setFont('Helvetica-Bold', 10)
-        pdf.drawString(x, y, LABELS[field] + ':')
+        pdf.drawString(x, y, FIELD_LABELS[field] + ':')
         pdf.setFont('Helvetica', 9)
         pdf.drawString(x, y - 20, record[field])
 

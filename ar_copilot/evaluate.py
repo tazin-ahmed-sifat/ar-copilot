@@ -8,12 +8,12 @@ import csv
 import hashlib
 import json
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import ROOT, configuration_status, gemini_settings
 from .core import FIELDS, validate
 from .extract import extract
+from .resilient import load_expected, run_stamp, score_fields
 
 
 def evaluate(folder=ROOT/'data', mode: str = 'demo', sample: str = 'full') -> dict:
@@ -24,16 +24,15 @@ def evaluate(folder=ROOT/'data', mode: str = 'demo', sample: str = 'full') -> di
         truth = [next(row for row in truth if row['layout'] == str(layout)) for layout in (1, 2, 3)]
     elif sample != 'full':
         raise ValueError('Unknown evaluation sample')
-    expected = {a['filename']: set(a['expected_errors']) for a in json.loads((folder/'anomalies.json').read_text())}
+    expected = load_expected(folder)
     details = [_score(row, extract((folder/'invoices'/row['filename']).read_bytes(), mode, folder/'demo_fixtures.json'),
                       expected) for row in truth]
     return _report(details, mode, sample, expected)
 
 
 def _score(row: dict, result: dict, expected: dict[str, set[str]]) -> dict:
-    matches = {f: not result['error'] and (result['fields'].get(f) or '') == row[f] for f in FIELDS}
+    matches, mismatches = score_fields(row, result)
     failures = validate(result['fields'])
-    mismatches = {f: {'expected': row[f], 'actual': result['fields'].get(f)} for f in FIELDS if not matches[f]}
     return dict(filename=row['filename'], layout=row['layout'], ground_truth={f: row[f] for f in FIELDS},
                 matches=matches, mismatches=mismatches, validation=failures,
                 missed_rules=sorted(expected.get(row['filename'], set()) - set(failures)), **result)
@@ -76,10 +75,6 @@ def database_fingerprint() -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
 
 
-def _timestamp() -> str:
-    return datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
-
-
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Evaluate extraction against the fictional ground truth.')
     parser.add_argument('--mode', choices=['demo', 'gemini'], default='demo')
@@ -120,7 +115,7 @@ def _run_resilient(args) -> int:
     from .resilient import run_evaluation
     from .retry import RetryPolicy
 
-    destination = ROOT/'reports/gemini'/f'resilient_{_timestamp()}.json'
+    destination = ROOT/'reports/gemini'/f'resilient_{run_stamp()}.json'
     policy = RetryPolicy(args.max_attempts, args.base_delay, args.max_delay, args.max_wait, args.pace)
     report = run_evaluation(destination, resume=args.resume, policy=policy, limit=args.limit)
     print(json.dumps({k: v for k, v in report.items() if k not in ('details', 'active_attempts')}, indent=2))
@@ -132,7 +127,7 @@ def _run_single(args) -> int:
     before = database_fingerprint()
     report = evaluate(mode=args.mode, sample=args.sample)
     report['review_database_unchanged'] = database_fingerprint() == before
-    report['run_id'] = _timestamp()
+    report['run_id'] = run_stamp()
     report['started_or_completed_at_note'] = 'Run ID is completion time in UTC; per-document durations use perf_counter.'
     destination = ROOT/'reports'/args.mode
     destination.mkdir(parents=True, exist_ok=True)

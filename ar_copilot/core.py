@@ -8,6 +8,8 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 FIELDS = ['document_type', 'supplier', 'customer', 'document_number', 'invoice_date',
           'due_date', 'po_number', 'currency', 'net', 'vat', 'total', 'linked_invoice']
+FIELD_LABELS = dict(zip(FIELDS, ['Document type', 'Supplier', 'Customer', 'Document number', 'Invoice date',
+                                 'Due date', 'PO number', 'Currency', 'Net', 'VAT', 'Total', 'Linked invoice']))
 SUPPLIER = 'Northbridge Auto Components Ltd'
 CUSTOMERS = ['Alder Motors Ltd', 'Beacon Vehicle Works Ltd', 'Cedar Automotive Ltd',
              'Dunmere Mobility Ltd', 'Elmbridge Motor Company Ltd']
@@ -15,6 +17,8 @@ BUCKETS = ['current', '1–30', '31–60', '61–90', '91+']
 # Upper bound in days overdue for each bucket after 'current'; anything beyond is '91+'.
 BUCKET_LIMITS = [(30, '1–30'), (60, '31–60'), (90, '61–90')]
 VAT_RATE = Decimal('0.20')
+# The fictional corpus is dated around this day; the app, fixture and QA exports default to it.
+DEMO_REPORTING_DATE = date(2026, 10, 10)
 PENNY = Decimal('0.01')
 DATE_FORMATS = ('%Y-%m-%d', '%d/%m/%Y', '%d %b %Y')
 

@@ -1,19 +1,10 @@
 """The hand-computed Excel fixture pins the aging rules that excel/aged_debt.pq must reproduce."""
-import csv
-from datetime import date
 from decimal import Decimal
 
-from ar_copilot.config import ROOT
 from ar_copilot.core import aged_debt
+from scripts.build_excel_fixture import REPORTING_DATE, read
 
-FIXTURE = ROOT / 'excel' / 'fixture'
-REPORTING_DATE = date(2026, 10, 10)
 COMPARED = ['customer', 'document_number', 'due_date', 'total', 'payments', 'credits', 'balance', 'days_overdue', 'bucket']
-
-
-def read(name: str) -> list[dict]:
-    with (FIXTURE / name).open(encoding='utf-8', newline='') as handle:
-        return list(csv.DictReader(handle))
 
 
 def normalise(row: dict) -> dict:

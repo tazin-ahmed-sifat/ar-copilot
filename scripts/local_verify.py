@@ -16,7 +16,7 @@ import pymupdf as fitz
 from PIL import Image, ImageDraw
 from streamlit.testing.v1 import AppTest
 from google.genai import types
-from ar_copilot.core import FIELDS, validate, aged_debt
+from ar_copilot.core import DEMO_REPORTING_DATE, FIELDS, validate, aged_debt
 from ar_copilot.extract import extract, Invoice
 from ar_copilot.store import Store
 from ar_copilot.export import workbook
@@ -37,9 +37,9 @@ def main():
     payments = list(csv.DictReader(Path('data/payments.csv').open()))
     store.import_payments(payments)
     records = store.documents()
-    debt = aged_debt(records, store.payments(), date(2026,10,10))
+    debt = aged_debt(records, store.payments(), DEMO_REPORTING_DATE)
     for kind in ('posted','debt'):
-        (output/f'offline_example_{kind}.xlsx').write_bytes(workbook(records, debt, date(2026,10,10), kind, store.payments()))
+        (output/f'offline_example_{kind}.xlsx').write_bytes(workbook(records, debt, DEMO_REPORTING_DATE, kind, store.payments()))
     images = []
     for number in (1,2,3,6,9,40):
         path = Path('data/invoices')/f'NC-{number:04d}.pdf'

@@ -16,18 +16,13 @@ from collections import Counter
 
 from ar_copilot.config import ROOT
 from ar_copilot.core import FIELDS
-from ar_copilot.resilient import metrics
+from ar_copilot.resilient import load_expected, metrics
 
 RESULTS = ROOT / 'results'
 # Output name and table title per evaluation sample.
 OUTPUTS = {'full': ('gemini_summary', 'Gemini extraction results'),
            'per-layout': ('gemini_smoke_summary', 'Gemini smoke test: one document per layout')}
 FIELD_COUNT = len(FIELDS)
-
-
-def load_expected_anomalies() -> dict[str, set[str]]:
-    anomalies = json.loads((ROOT / 'data' / 'anomalies.json').read_text())
-    return {a['filename']: set(a['expected_errors']) for a in anomalies}
 
 
 def public_summary(report: dict, expected: dict[str, set[str]]) -> dict:
@@ -133,7 +128,7 @@ def main() -> None:
     report = json.loads(args.report.read_text(encoding='utf-8'))
     if report.get('mode') != 'gemini' or report.get('sample') not in OUTPUTS:
         raise SystemExit('Only Gemini runs are published; demo fixture checks are not accuracy.')
-    summary = public_summary(report, load_expected_anomalies())
+    summary = public_summary(report, load_expected(ROOT / 'data'))
     RESULTS.mkdir(exist_ok=True)
     name = OUTPUTS[summary['sample']][0]
     (RESULTS / f'{name}.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')

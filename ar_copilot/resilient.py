@@ -8,6 +8,7 @@ import csv
 import hashlib
 import io
 import json
+import random
 import time
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -30,12 +31,29 @@ def atomic_save(path, report: dict) -> None:
     temporary.replace(path)
 
 
+def run_stamp() -> str:
+    """UTC timestamp used for run ids and report file names."""
+    return datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+
+
+def load_expected(folder: Path) -> dict[str, set[str]]:
+    """The intentional anomalies and the rule codes each should trigger."""
+    anomalies = json.loads((Path(folder) / 'anomalies.json').read_text())
+    return {a['filename']: set(a['expected_errors']) for a in anomalies}
+
+
+def score_fields(row: dict, result: dict) -> tuple[dict, dict]:
+    """Exact string match per field; a failed extraction matches nothing, blank equals missing."""
+    matches = {f: not result['error'] and (result['fields'].get(f) or '') == row[f] for f in FIELDS}
+    mismatches = {f: dict(expected=row[f], actual=result['fields'].get(f)) for f in FIELDS if not matches[f]}
+    return matches, mismatches
+
+
 def compare(row: dict, result: dict) -> dict:
     """Score one extraction against printed truth by exact string match on every field."""
-    matches = {f: not result['error'] and (result['fields'].get(f) or '') == row[f] for f in FIELDS}
+    matches, mismatches = score_fields(row, result)
     # A failed call has no fields to validate; flagging it would count an outage as an anomaly.
     rules = validate(result['fields']) if not result['error'] else []
-    mismatches = {f: dict(expected=row[f], actual=result['fields'].get(f)) for f in FIELDS if not matches[f]}
     return dict(filename=row['filename'], layout=row['layout'], ground_truth={f: row[f] for f in FIELDS},
                 matches=matches, mismatches=mismatches, validation=rules, **result)
 
@@ -80,7 +98,7 @@ def metrics(details: list[dict], expected: dict[str, set[str]]) -> dict:
 
 
 def run_evaluation(output, folder=ROOT/'data', resume=None, policy=None, limit=None,
-                   call=extract, sleep=time.sleep, monotonic=time.perf_counter, uniform=None,
+                   call=extract, sleep=time.sleep, monotonic=time.perf_counter, uniform=random.uniform,
                    announce=print, database=None) -> dict:
     """Evaluate every failed or pending document, checkpointing to `output` after each step.
 
@@ -91,15 +109,17 @@ def run_evaluation(output, folder=ROOT/'data', resume=None, policy=None, limit=N
     folder, output = Path(folder), Path(output)
     _check_paths(output, resume, limit)
     rows = list(csv.DictReader((folder/'ground_truth.csv').open(encoding='utf-8')))
-    expected = {a['filename']: set(a['expected_errors'])
-                for a in json.loads((folder/'anomalies.json').read_text())}
+    expected = load_expected(folder)
     source = _load_source(resume, rows)
     prior_by_name = {r['filename']: r for r in source['details']} if source else {}
     payloads = {r['filename']: (folder/'invoices'/r['filename']).read_bytes() for r in rows}
     details = [_starting_detail(row, payloads[row['filename']], prior_by_name.get(row['filename']))
                for row in rows]
-    run = _Run(output, folder, source, resume, policy, details, expected, call, sleep, monotonic,
-               uniform, announce, Path(database) if database else ROOT/'runtime/ar.sqlite')
+    prior_seconds = source.get('cumulative_observed_seconds', source.get('seconds_total', 0)) if source else 0
+    run = _Run(output=output, folder=folder, policy=policy, details=details, expected=expected,
+               resume_source=str(resume) if resume else None, prior_seconds=prior_seconds,
+               call=call, sleep=sleep, monotonic=monotonic, uniform=uniform, announce=announce,
+               database=Path(database) if database else ROOT/'runtime/ar.sqlite')
     return run.execute(rows, payloads, limit)
 
 
@@ -132,9 +152,10 @@ def _starting_detail(row: dict, raw: bytes, prior: dict | None) -> dict:
         return dict(compare(row, pending), source_hash=digest)
     if prior['ground_truth'] != {f: row[f] for f in FIELDS}:
         raise ValueError('Ground truth changed; do not reuse this report')
-    if prior.get('source_hash') and prior['source_hash'] != digest:
-        raise ValueError('PDF changed; do not reuse this report')
-    if not prior.get('source_hash'):
+    if prior.get('source_hash'):
+        if prior['source_hash'] != digest:
+            raise ValueError('PDF changed; do not reuse this report')
+    else:
         # Reports written before hashes were recorded can only be checked by their text.
         text = '\n'.join(page.extract_text() or '' for page in PdfReader(io.BytesIO(raw)).pages)
         if text != prior.get('text'):
@@ -148,8 +169,9 @@ def _starting_detail(row: dict, raw: bytes, prior: dict | None) -> dict:
 class _Run:
     """State for one evaluator invocation: the report, its checkpoint file and request pacing."""
 
-    def __init__(self, output, folder, source, resume, policy, details, expected, call, sleep,
-                 monotonic, uniform, announce, database: Path):
+    def __init__(self, *, output: Path, folder: Path, policy: RetryPolicy, details: list[dict],
+                 expected: dict[str, set[str]], resume_source: str | None, prior_seconds: float,
+                 call, sleep, monotonic, uniform, announce, database: Path):
         self.output, self.folder, self.policy = output, folder, policy
         self.details, self.expected = details, expected
         self.call, self.sleep, self.monotonic = call, sleep, monotonic
@@ -158,10 +180,9 @@ class _Run:
         self.database_before = self._fingerprint()
         self.started = monotonic()
         self.last_request_start = None
-        prior_seconds = source.get('cumulative_observed_seconds', source.get('seconds_total', 0)) if source else 0
         self.report = dict(
-            mode='gemini', sample='full', run_id=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'),
-            resume_source=str(resume) if resume else None, policy=asdict(policy), details=details,
+            mode='gemini', sample='full', run_id=run_stamp(),
+            resume_source=resume_source, policy=asdict(policy), details=details,
             state='running', stop_reason=None, attempted_this_run=0,
             successful_calls_reused=sum(not r['error'] for r in details),
             new_request_seconds=0.0, new_retry_wait_seconds=0.0, new_pacing_wait_seconds=0.0,
@@ -231,10 +252,8 @@ class _Run:
         report['active_document'] = row['filename']
         report['active_attempts'] = []
         self.save()
-        options = dict(sleep=self.sleep, on_attempt=self.record_attempt)
-        if self.uniform:
-            options['uniform'] = self.uniform
-        result = run_with_retry(lambda: self.paced_call(raw), self.policy, **options)
+        result = run_with_retry(lambda: self.paced_call(raw), self.policy, sleep=self.sleep,
+                                uniform=self.uniform, on_attempt=self.record_attempt)
         previous = self.details[index]
         new = compare(row, result)
         new['source_hash'] = previous['source_hash']

@@ -7,7 +7,7 @@ import pymupdf as fitz
 import streamlit as st
 
 from . import config
-from .core import parse_date
+from .core import FIELD_LABELS, parse_date  # FIELD_LABELS re-exported for the views
 from .store import Store
 
 # Status → (label, ink colour). Colours match the theme in .streamlit/config.toml.
@@ -15,13 +15,6 @@ STAMPS = {
     'review': ('Needs review', '#A86A12'),
     'approved': ('Approved', '#2E6A4E'),
     'rejected': ('Rejected', '#9E3A2B'),
-}
-
-FIELD_LABELS = {
-    'document_type': 'Document type', 'supplier': 'Supplier', 'customer': 'Customer',
-    'document_number': 'Document number', 'invoice_date': 'Invoice date', 'due_date': 'Due date',
-    'po_number': 'PO number', 'currency': 'Currency', 'net': 'Net', 'vat': 'VAT', 'total': 'Total',
-    'linked_invoice': 'Linked invoice',
 }
 
 CHECK_MESSAGES = {

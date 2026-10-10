@@ -11,14 +11,13 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import csv
-from datetime import date
 
 from ar_copilot.config import ROOT
-from ar_copilot.core import aged_debt
+from ar_copilot.core import DEMO_REPORTING_DATE, aged_debt
 from ar_copilot.export import workbook
 
 FIXTURE = ROOT / 'excel' / 'fixture'
-REPORTING_DATE = date(2026, 10, 10)
+REPORTING_DATE = DEMO_REPORTING_DATE
 
 
 def read(name: str) -> list[dict]:

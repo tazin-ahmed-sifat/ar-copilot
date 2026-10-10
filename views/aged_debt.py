@@ -1,16 +1,14 @@
 """Aged debt: what each customer owes as at a reporting date, by how overdue it is."""
-from datetime import date
 from decimal import Decimal
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ar_copilot.core import BUCKETS, aged_debt
+from ar_copilot.core import BUCKETS, DEMO_REPORTING_DATE, aged_debt
 from ar_copilot.export import BUCKET_COLOURS, BUCKET_LABELS, workbook
 from ar_copilot.ui import display_date, gbp, open_store
 
-DEFAULT_REPORTING_DATE = date(2026, 10, 10)  # the date the fictional corpus is built around
 XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 
@@ -80,7 +78,7 @@ def excluded(records: list[dict], payments: list[dict]) -> None:
 store = open_store()
 records, payments = store.documents(), store.payments()
 st.title('Aged debt')
-reporting_date = st.date_input('Reporting date', DEFAULT_REPORTING_DATE, format='DD/MM/YYYY', width=200)
+reporting_date = st.date_input('Reporting date', DEMO_REPORTING_DATE, format='DD/MM/YYYY', width=200)
 debt = aged_debt(records, payments, reporting_date)
 
 if debt:

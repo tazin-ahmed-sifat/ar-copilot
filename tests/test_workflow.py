@@ -3,6 +3,7 @@ import io
 import json
 import sqlite3
 import zipfile
+from tests.helpers import sheet_xml
 from datetime import date, timedelta
 from decimal import Decimal
 import pytest
@@ -100,7 +101,7 @@ def test_export_real_excel_tables_and_formula_injection(corpus):
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         assert 'xl/tables/table1.xml' in archive.namelist()
         assert b'PostedReceivables' in archive.read('xl/tables/table1.xml')
-        assert b'<f>' not in archive.read('xl/worksheets/sheet1.xml')
+        assert b'<f>' not in sheet_xml(archive, 'PostedReceivables')
         assert b'=CMD()' in archive.read('xl/sharedStrings.xml')
 
 def test_extraction_errors_are_reviewable():
@@ -143,3 +144,19 @@ def test_app_smoke(tmp_path, monkeypatch):
     next(b for b in app.button if b.label == 'Save decision').click().run(timeout=30)
     assert not app.exception
     assert Store().documents()[0]['status'] == 'approved'
+
+def test_summary_sheet_totals_are_traceable_formulas(corpus):
+    from xml.etree import ElementTree as ET
+    from tests.helpers import NS
+    records = [dict(r, status='approved', posting_key=r['document_number'], hash=r['document_number'])
+               for r in corpus[1] if not validate(r) and r['document_type'] == 'invoice']
+    debt = aged_debt(records, [], date(2026, 10, 10))
+    with zipfile.ZipFile(io.BytesIO(workbook(records, debt, date(2026, 10, 10)))) as archive:
+        summary = ET.fromstring(sheet_xml(archive, 'Summary'))
+        assert b'<f>' not in sheet_xml(archive, 'AgedDebt')
+    formulas = {c.attrib['r']: c for c in summary.iter(f"{{{NS['m']}}}c") if c.find('m:f', NS) is not None}
+    customers = sorted({r['customer'] for r in debt})
+    total_row = 6 + len(customers)
+    assert formulas['B6'].find('m:f', NS).text == f'SUMIF(AgedDebt!$A$2:$A${len(debt) + 1},$A6,AgedDebt!$J$2:$J${len(debt) + 1})'
+    grand_total = Decimal(formulas[f'G{total_row}'].find('m:v', NS).text)
+    assert grand_total == sum(r['balance'] for r in debt)

@@ -39,7 +39,7 @@ def main():
     records = store.documents()
     debt = aged_debt(records, store.payments(), date(2026,10,10))
     for kind in ('posted','debt'):
-        (output/f'offline_example_{kind}.xlsx').write_bytes(workbook(records, debt, date(2026,10,10), kind))
+        (output/f'offline_example_{kind}.xlsx').write_bytes(workbook(records, debt, date(2026,10,10), kind, store.payments()))
     images = []
     for number in (1,2,3,6,9,40):
         path = Path('data/invoices')/f'NC-{number:04d}.pdf'

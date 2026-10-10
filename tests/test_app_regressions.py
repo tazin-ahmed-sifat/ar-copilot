@@ -12,6 +12,7 @@ from ar_copilot.generate import generate
 from ar_copilot.store import Store
 from ar_copilot.payments import parse_payment_csv
 from ar_copilot.export import workbook
+from tests.helpers import sheet_xml
 
 @pytest.fixture
 def isolated_app(tmp_path, monkeypatch):
@@ -76,11 +77,11 @@ def test_complete_demo_import_review_export(isolated_app, monkeypatch):
             assert table.attrib['name'] == 'PostedReceivables'
             assert table.attrib['ref'] == 'A1:O3'
             ns = {'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-            sheet = ET.fromstring(book.read('xl/worksheets/sheet1.xml'))
+            sheet = ET.fromstring(sheet_xml(book, 'PostedReceivables'))
             assert sheet.find(".//m:c[@r='M2']/m:v",ns) is not None
             assert sheet.find(".//m:c[@r='H2']",ns).attrib.get('t') != 's'
             if label == 'Aged debt workbook':
-                aged = ET.fromstring(book.read('xl/worksheets/sheet2.xml'))
+                aged = ET.fromstring(sheet_xml(book, 'AgedDebt'))
                 assert aged.find(".//m:c[@r='G2']/m:v",ns).text == '2066.89'
                 assert aged.find(".//m:c[@r='G3']/m:v",ns).text == '0'
                 assert ET.fromstring(book.read('xl/tables/table2.xml')).attrib['ref']=='A1:N3'

@@ -4,6 +4,10 @@
 exports workbooks; everything below is built by hand in SharePoint, Power Automate and Teams.
 Change this line only after the test checklist at the end has passed, and record the evidence.
 
+Brunel University accounts can't create SharePoint sites or Teams teams, so this design can't be
+built there. A reduced version using OneDrive, Excel and an email to yourself is documented
+separately in [microsoft365_onedrive.md](microsoft365_onedrive.md).
+
 What you end up with:
 
 1. A SharePoint library that receives the exported workbooks.

@@ -8,6 +8,7 @@ __pycache__/
 runtime/
 tmp/
 reports/
+results/timings.csv
 output/
 data/
 .aws/

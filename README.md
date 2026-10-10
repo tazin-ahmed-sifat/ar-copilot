@@ -111,8 +111,11 @@ mismatches. The table counts each document's latest outcome, so the temporary 50
 not additional failed documents. The demo database, review decisions and original reports were
 unchanged. Offline fixtures remain separate from these live results.
 
-**Time saved has not been measured yet.** The *Time a document* page records it, and
-`python scripts/summarize_timings.py` writes `results/timing_summary.md` once real timings exist.
+**Time saved has not been measured yet.** Follow the [timing procedure](docs/timing_procedure.md)
+in *Time a document*: separate practice PDFs, 12 counterbalanced tasks, extraction wait through
+final submission, and retained incomplete attempts/API failures. Raw evidence stays local in
+`runtime/timings.csv`; `python scripts/summarize_timings.py` validates it and publishes aggregate
+results only after real measurements exist. Demo fixture timings never establish Gemini time saved.
 
 Limitations:
 

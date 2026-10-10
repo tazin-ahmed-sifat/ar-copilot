@@ -70,6 +70,7 @@ def test_new_upload_is_shown_even_when_another_filter_is_active(seeded, monkeypa
 
 
 def test_timing_save_confirmation_survives_the_rerun(seeded):
+    generate(seeded[2] / 'runtime' / 'timing_data', seed=20261011)
     app = AppTest.from_file(APP, default_timeout=30).run()
     app.switch_page('views/timing.py').run()
     app.text_input[0].set_value('tester').run()

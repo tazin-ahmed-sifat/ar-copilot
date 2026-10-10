@@ -20,5 +20,4 @@ def gemini_settings():
 
 def configuration_status():
     key, model = gemini_settings()
-    return {'env_file_exists': ENV_PATH.exists(), 'key_configured': bool(key),
-            'model': model, 'key_value': 'NEVER DISPLAYED'}
+    return {'env_file_exists': ENV_PATH.exists(), 'key_configured': bool(key), 'model': model}

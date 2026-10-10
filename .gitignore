@@ -10,8 +10,6 @@ tmp/
 reports/
 output/
 data/
-.agents/
-.codex/
 .aws/
 *.sqlite
 *.sqlite-*

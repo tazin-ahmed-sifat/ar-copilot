@@ -31,8 +31,8 @@ def test_default_model_is_defined_once_and_matches_env_example(tmp_path, monkeyp
     assert config.DEFAULT_MODEL != 'gemini-2.5-flash'
 
 def test_dotenv_is_ignored_by_git(tmp_path):
-    # This workspace need not be a Git repo; validate its real ignore rules
-    # inside an isolated temporary repo without initializing the user's repo.
+    # Check the real ignore rules in a throwaway repository, so the test works
+    # in an exported copy of the project that has no .git directory.
     root = Path(__file__).resolve().parents[1]
     (tmp_path/'.gitignore').write_bytes((root/'.gitignore').read_bytes())
     subprocess.run(['git','init','--quiet',str(tmp_path)], check=True, capture_output=True)

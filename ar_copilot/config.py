@@ -23,3 +23,25 @@ def gemini_settings() -> tuple[str, str]:
 def configuration_status() -> dict:
     key, model = gemini_settings()
     return {'env_file_exists': ENV_PATH.exists(), 'key_configured': bool(key), 'model': model}
+
+def setting(name, default=''):
+    local = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
+    return str(os.environ.get(name, local.get(name) or default)).strip()
+
+
+def local_only():
+    return setting('AR_LOCAL_ONLY', '1').lower() not in ('0', 'false', 'no')
+
+
+def providers():
+    return ['ollama', 'demo'] + ([] if local_only() else ['gemini'])
+
+
+def ollama_settings():
+    endpoint = setting('OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
+    if endpoint != 'http://127.0.0.1:11434':
+        raise ValueError('Ollama endpoint must be http://127.0.0.1:11434')
+    model = setting('OLLAMA_MODEL', 'qwen3:8b')
+    if model != 'qwen3:8b':
+        raise ValueError('Only the installed local qwen3:8b model is supported')
+    return endpoint, model

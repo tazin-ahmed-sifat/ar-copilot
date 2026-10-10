@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import uuid4
 import streamlit as st
 from ar_copilot import config
-from ar_copilot.config import configuration_status
+from ar_copilot.config import configuration_status, providers
 from ar_copilot.core import FIELDS, validate
 from ar_copilot.extract import extract
 from ar_copilot.retry import STOP_KINDS
@@ -51,7 +51,8 @@ with st.container(border=True):
     if practice:
         practice_method = st.segmented_control('Practice method', ['manual', 'assisted'], default='manual', disabled=bool(session))
         if practice_method == 'assisted':
-            practice_mode = st.radio('Practice extraction', ['demo', 'gemini'], disabled=bool(session))
+            practice_mode = st.radio('Practice extraction', providers(), disabled=bool(session))
+    assisted_provider = st.selectbox('Measured extraction provider', [p for p in providers() if p != 'demo'], disabled=bool(session))
     quota_reset = st.checkbox('I have confirmed available Gemini quota after a previous quota stop',
                               value=False, disabled=bool(session))
     unseen = st.checkbox('I had not read the measured timing documents before this study', disabled=bool(session))
@@ -93,9 +94,9 @@ if not session:
             st.error('This document was already attempted. Repeating it would introduce learning bias. '
                      'Do not restart this plan under a new study code.')
             st.stop()
-        mode = 'gemini' if task and task['method'] == 'assisted' else 'none'
+        mode = assisted_provider if task and task['method'] == 'assisted' else 'none'
     if task:
-        st.info(f"Next: {'key by hand' if task['method'] == 'manual' else 'Gemini extraction and review'}"
+        st.info(f"Next: {'key by hand' if task['method'] == 'manual' else mode + ' extraction and review'}"
                 + (f" - task {task['sequence']}/12, layout {task['layout']}" if not practice else ' - practice'))
     else:
         st.caption('This practice method/set or the measured plan is finished.')

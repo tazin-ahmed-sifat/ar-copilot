@@ -90,7 +90,7 @@ def validate_timing(t):
         raise ValueError('Timing requires a UTC timestamp and operator alias')
     if t.protocol not in ('legacy', 'practice-v1', PROTOCOL) or (t.protocol == 'practice-v1' and not t.practice):
         raise ValueError('Invalid timing protocol')
-    if (t.method, t.extraction_mode) not in {('manual', 'none'), ('assisted', 'demo'), ('assisted', 'gemini')}:
+    if (t.method, t.extraction_mode) not in {('manual', 'none'), ('assisted', 'demo'), ('assisted', 'gemini'), ('assisted', 'ollama')}:
         raise ValueError('Invalid method/extraction mode')
     if t.status not in ('in_progress', 'completed', 'incomplete'):
         raise ValueError('Invalid attempt status')
@@ -199,6 +199,8 @@ def comparison(timings):
         return unavailable
     if len({r.corpus_id for r in measured}) != 1:
         return dict(available=False, reason='Different corpora must be summarized separately.')
+    if len({(r.extraction_mode, r.model) for r in measured if r.method == 'assisted'}) != 1:
+        return dict(available=False, reason='Different providers/models must be summarized separately.')
     batches = {}
     for row in measured:
         batches.setdefault((row.operator, row.study_id), []).append(row)
@@ -206,7 +208,7 @@ def comparison(timings):
     for batch in batches.values():
         if len({r.cohort for r in batch}) != 1 or len(batch) != 12 or {r.sequence for r in batch} != set(range(1, 13)):
             return unavailable
-        if any(r.status == 'in_progress' or (r.method == 'assisted' and r.model != 'gemini-3.8-flash') for r in batch):
+        if any(r.status == 'in_progress' or (r.method == 'assisted' and (r.extraction_mode, r.model) not in {('gemini', 'gemini-3.8-flash'), ('ollama', 'qwen3:8b')}) for r in batch):
             return unavailable
         if any(r.operator == batch[0].operator and r.corpus_id == batch[0].corpus_id and r not in batch
                and r.filename in {b.filename for b in batch} for r in timings):

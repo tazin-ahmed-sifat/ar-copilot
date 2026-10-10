@@ -73,6 +73,7 @@ def test_provider_error_does_not_expose_exception_message(tmp_path, monkeypatch)
         def __init__(self, **kwargs):
             raise ValueError('Provider echoed FAKE_VALUE')
     monkeypatch.setattr(genai,'Client',FakeClient)
+    monkeypatch.setenv('AR_LOCAL_ONLY', '0')
     result=extract((folder/'invoices/NC-0001.pdf').read_bytes(),'gemini')
     assert result['error'] and 'FAKE_VALUE' not in json.dumps(result)
 
@@ -84,5 +85,6 @@ def test_failed_gemini_call_still_records_the_model(tmp_path, monkeypatch):
         def __init__(self, **kwargs):
             raise RuntimeError('mock outage')
     monkeypatch.setattr(genai, 'Client', FailingClient)
+    monkeypatch.setenv('AR_LOCAL_ONLY', '0')
     result = extract((folder/'invoices/NC-0001.pdf').read_bytes(), 'gemini')
     assert result['error'] and result['model'] == 'test-model'

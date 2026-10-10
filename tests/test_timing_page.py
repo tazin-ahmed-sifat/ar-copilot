@@ -43,7 +43,7 @@ def test_clock_includes_extraction_and_submission_and_start_is_durable(tmp_path,
     assert not app.exception
     result = load_timings()[0]
     assert result.seconds == 25 and result.extraction_seconds == 5
-    assert result.practice and result.extraction_mode == 'demo'
+    assert result.practice and result.extraction_mode == 'ollama'
     assert result.status == 'completed' and result.field_errors > 0
     assert summarise(load_timings())['groups'] == {}
 
@@ -76,6 +76,7 @@ def test_lost_session_is_retained_without_guessing_duration(tmp_path, monkeypatc
 
 
 def test_daily_quota_stops_and_does_not_retry(tmp_path, monkeypatch):
+    monkeypatch.setenv('AR_LOCAL_ONLY', '0')
     app = page(tmp_path, monkeypatch)
     app.segmented_control[0].set_value('assisted').run()
     next(w for w in app.radio if w.label == 'Practice extraction').set_value('gemini').run()
@@ -116,6 +117,7 @@ def test_manual_entry_scoring_does_not_store_entered_values(tmp_path, monkeypatc
 def test_demo_proposal_corrections_and_decision_errors_are_scored(tmp_path, monkeypatch):
     app = page(tmp_path, monkeypatch)
     app.segmented_control[0].set_value('assisted').run()
+    next(w for w in app.radio if w.label == 'Practice extraction').set_value('demo').run()
     button(app, 'Start next document').click().run()
     assert not app.exception
     next(w for w in app.text_input if w.label == 'Net').set_value('0.00')

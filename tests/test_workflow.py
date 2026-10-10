@@ -35,7 +35,7 @@ def test_reproducible_corpus_and_printed_truth(corpus, tmp_path):
         for field in FIELDS:
             if row[field]:
                 assert row[field] in text
-        result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+        result = extract(pdf, mode='demo', fixtures=folder/'demo_fixtures.json')
         assert not result['error']
         assert result['fields'] == {f: row[f] for f in FIELDS}
     assert validate(rows[5]) == ['missing:po_number']
@@ -52,7 +52,7 @@ def test_review_duplicate_and_payment_idempotency(corpus, tmp_path):
     folder, rows = corpus
     store = Store(tmp_path/'db.sqlite')
     pdf = (folder/'invoices'/rows[0]['filename']).read_bytes()
-    result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+    result = extract(pdf, mode='demo', fixtures=folder/'demo_fixtures.json')
     document = store.ingest('first.pdf', pdf, result)
     assert store.ingest('renamed.pdf', pdf, result) == document
     store.review(document, result['fields'], 'save', 'Tester', 'Checked fields')
@@ -75,7 +75,7 @@ def test_missing_fields_and_unallocated_credit_block_posting(corpus, tmp_path):
     folder, rows = corpus
     for index in (5, 8, 39):
         pdf = (folder/'invoices'/rows[index]['filename']).read_bytes()
-        result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+        result = extract(pdf, mode='demo', fixtures=folder/'demo_fixtures.json')
         doc = store.ingest(str(index), pdf, result)
         with pytest.raises(ValueError):
             store.review(doc, result['fields'], 'approve', 'Tester', 'Attempt')
@@ -114,7 +114,7 @@ def test_corrections_and_credit_allocation(corpus, tmp_path):
     store = Store(tmp_path/'db.sqlite')
     for index in (4, 39, 5):
         pdf = (folder/'invoices'/rows[index]['filename']).read_bytes()
-        result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+        result = extract(pdf, mode='demo', fixtures=folder/'demo_fixtures.json')
         doc = store.ingest(str(index), pdf, result)
         fields = dict(result['fields'])
         if index == 5:

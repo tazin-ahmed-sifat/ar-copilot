@@ -147,7 +147,7 @@ queue = st.dataframe(queue_table(visible), key=table_key, on_select='rerun', sel
 record = choose_document(visible, [cell[0] for cell in queue.selection.cells])
 extraction = json.loads(record['extraction'])
 heading_with_status(record.get('document_number') or record['filename'], record['status'])
-source = 'offline fixtures' if extraction['mode'] == 'demo' else f"Gemini ({extraction.get('model') or 'model unknown'})"
+source = 'offline fixtures' if extraction['mode'] == 'demo' else f"{extraction['mode'].capitalize()} ({extraction.get('model') or 'model unknown'})"
 st.caption(f"{record['filename']}, extracted from {source} in {extraction['seconds']:.2f} s.")
 
 pdf_column, form_column = st.columns([1, 1], gap='large')

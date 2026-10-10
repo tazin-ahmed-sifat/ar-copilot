@@ -62,13 +62,23 @@ together. It is readable as it stands. To space it out, a Compose step can wrap 
 styled HTML, for example replacing `<table>` with `<table style="border-collapse:collapse">`
 and adding `style="padding:4px 12px"` to `<td>` and `<th>`. That change hasn't been made or tested.
 
-### Why the only row is NC-0003 at full value
+### Why the test email showed NC-0003 at full value
 
-The balance equals the invoice total, so no payment was applied. The demo ledger
-(`data/payments.csv`) pays NC-0003 in full on 16 May 2026 (PAY-0003), which means this workbook
-was exported before the ledger was imported. The flow read the table correctly. For a demo that
-reflects payments, import the ledger in the app, export again, replace the file in OneDrive, and
-rerun: NC-0003 then has a zero balance and drops out of the overdue list.
+The balance equalled the invoice total, so no payment had been applied. The demo ledger
+(`data/payments.csv`) pays NC-0003 in full on 16 May 2026 (PAY-0003); that workbook was exported
+before the ledger was imported. The flow read the table correctly.
+
+### Workbook refreshed, 10 October 2026
+
+The demo ledger was imported into the app database and the workbook exported again. In the new
+`ar_debt_2026-10-10.xlsx`, NC-0003 is paid in full (balance £0.00), so no invoice is overdue and
+the next run would email a table with headings and no rows. The flow has not been run against it.
+
+The old file was deleted and the new one uploaded, which gave it a new OneDrive item ID, and step 2
+then failed with HTTP 404 (`itemNotFound`). Step 2 was pointed at the new file and the AgedDebt
+table re-selected; the table ID is unchanged because the exporter writes it the same way each time.
+To avoid this, upload a new export with the same name and choose **Replace**, which keeps the
+item ID; deleting first and uploading again does not.
 
 ## Differences from the full design
 

@@ -1,2 +1,30 @@
 [browser]
 gatherUsageStats = false
+
+# Ledger palette: cool paper, blue-black ink, steel-blue actions.
+# Status colours (green / amber / oxide red) are reused by the stamp badges in ar_copilot/ui.py.
+[theme]
+base = "light"
+primaryColor = "#2C5A88"
+backgroundColor = "#F6F7F5"
+secondaryBackgroundColor = "#ECEFEC"
+textColor = "#1C2A35"
+borderColor = "#D3D9DD"
+dataframeBorderColor = "#D3D9DD"
+dataframeHeaderBackgroundColor = "#ECEFEC"
+linkColor = "#2C5A88"
+greenColor = "#2E6A4E"
+orangeColor = "#A86A12"
+redColor = "#9E3A2B"
+blueColor = "#2C5A88"
+grayColor = "#5A6670"
+font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap, sans-serif"
+headingFont = "IBM Plex Sans Condensed:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap, sans-serif"
+headingFontWeights = [600, 600, 600, 500, 500, 500]
+baseRadius = "0.3rem"
+buttonRadius = "0.3rem"
+showWidgetBorder = true
+chartCategoricalColors = ["#2C5A88", "#7A9CBF", "#A86A12", "#2E6A4E", "#9E3A2B"]
+
+[theme.sidebar]
+backgroundColor = "#E9EDEA"

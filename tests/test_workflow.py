@@ -1,0 +1,145 @@
+import csv
+import io
+import json
+import sqlite3
+import zipfile
+from datetime import date, timedelta
+from decimal import Decimal
+import pytest
+from pypdf import PdfReader
+from streamlit.testing.v1 import AppTest
+from ar_copilot.core import validate, aged_debt, BUCKETS, FIELDS
+from ar_copilot.generate import generate
+from ar_copilot.extract import extract
+from ar_copilot.store import Store
+from ar_copilot.export import workbook
+
+@pytest.fixture
+def corpus(tmp_path):
+    rows = generate(tmp_path/'data')
+    return tmp_path/'data', rows
+
+def test_reproducible_corpus_and_printed_truth(corpus, tmp_path):
+    folder, rows = corpus
+    other = tmp_path/'other'
+    assert rows == generate(other)
+    assert len(rows) == 40
+    assert len({r['layout'] for r in rows}) == 3
+    for row in rows:
+        pdf = (folder/'invoices'/row['filename']).read_bytes()
+        assert pdf == (other/'invoices'/row['filename']).read_bytes()
+        text = PdfReader(io.BytesIO(pdf)).pages[0].extract_text()
+        assert 'FICTIONAL' in text
+        for field in FIELDS:
+            if row[field]:
+                assert row[field] in text
+        result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+        assert not result['error']
+        assert result['fields'] == {f: row[f] for f in FIELDS}
+    assert validate(rows[5]) == ['missing:po_number']
+    assert validate(rows[8]) == ['totals']
+    assert all(not validate(r) for i,r in enumerate(rows) if i not in (5,8))
+
+@pytest.mark.parametrize('field,value,error', [('net','NaN','amounts'), ('net','1.001','amounts'),
+    ('invoice_date','2026-02-30','dates'), ('vat','0.00','vat_rate'), ('total','-1.00','sign')])
+def test_validation_mutations(corpus, field, value, error):
+    record = dict(corpus[1][0]); record[field] = value
+    assert error in validate(record)
+
+def test_review_duplicate_and_payment_idempotency(corpus, tmp_path):
+    folder, rows = corpus
+    store = Store(tmp_path/'db.sqlite')
+    pdf = (folder/'invoices'/rows[0]['filename']).read_bytes()
+    result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+    document = store.ingest('first.pdf', pdf, result)
+    assert store.ingest('renamed.pdf', pdf, result) == document
+    store.review(document, result['fields'], 'save', 'Tester', 'Checked fields')
+    store.review(document, result['fields'], 'approve', 'Tester', 'Source verified')
+    assert len(store.history(document)) == 2
+    with pytest.raises(ValueError):
+        store.review(document, result['fields'], 'reject', 'Tester', 'Locked')
+    second = store.ingest('different.pdf', pdf+b'\n', result)
+    with pytest.raises(sqlite3.IntegrityError):
+        store.review(second, result['fields'], 'approve', 'Tester', 'Same business identity')
+    assert len(store.history(second)) == 0
+    payment = dict(payment_id='P1', invoice_number=rows[0]['document_number'], customer=rows[0]['customer'], payment_date='2026-10-01', amount='10.00')
+    store.import_payments([payment]); store.import_payments([payment])
+    assert len(store.payments()) == 1
+    with pytest.raises(ValueError):
+        store.import_payments([dict(payment, amount='20.00')])
+
+def test_missing_fields_and_unallocated_credit_block_posting(corpus, tmp_path):
+    store = Store(tmp_path/'db.sqlite')
+    folder, rows = corpus
+    for index in (5, 8, 39):
+        pdf = (folder/'invoices'/rows[index]['filename']).read_bytes()
+        result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+        doc = store.ingest(str(index), pdf, result)
+        with pytest.raises(ValueError):
+            store.review(doc, result['fields'], 'approve', 'Tester', 'Attempt')
+    assert all(r['status']=='review' for r in store.documents())
+
+def test_aging_boundaries_and_as_of(corpus):
+    base = dict(corpus[1][0], status='approved', invoice_date='2026-01-01', total='120.00')
+    report = date(2026, 10, 10)
+    records = [dict(base, document_number=str(i), due_date=(report-timedelta(days=days)).isoformat())
+               for i,days in enumerate((-1,0,1,30,31,60,61,90,91))]
+    assert [r['bucket'] for r in aged_debt(records, [], report)] == [BUCKETS[i] for i in (0,0,1,1,2,2,3,3,4)]
+    credit = dict(base, document_type='credit_note', linked_invoice='0', total='-24.00', invoice_date='2026-10-09')
+    payments = [dict(customer=base['customer'], invoice_number='0', amount='60.00', payment_date='2026-10-10'),
+                dict(customer=base['customer'], invoice_number='0', amount='10.00', payment_date='2026-10-11')]
+    result = aged_debt(records+[credit, dict(base, status='review')], payments, report)
+    assert len(result) == 9
+    assert result[0]['balance'] == Decimal('36.00')
+    assert aged_debt([dict(base, invoice_date='2026-10-11')], [], report) == []
+
+def test_export_real_excel_tables_and_formula_injection(corpus):
+    record = dict(corpus[1][0], status='approved', posting_key='=CMD()', hash='hash')
+    debt = aged_debt([record], [], date(2026,10,10))
+    content = workbook([record], debt, date(2026,10,10))
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        assert 'xl/tables/table1.xml' in archive.namelist()
+        assert b'PostedReceivables' in archive.read('xl/tables/table1.xml')
+        assert b'<f>' not in archive.read('xl/worksheets/sheet1.xml')
+        assert b'=CMD()' in archive.read('xl/sharedStrings.xml')
+
+def test_extraction_errors_are_reviewable():
+    result = extract(b'not a pdf')
+    assert result['error'] and not result['fields']
+
+def test_corrections_and_credit_allocation(corpus, tmp_path):
+    folder, rows = corpus
+    store = Store(tmp_path/'db.sqlite')
+    for index in (4, 39, 5):
+        pdf = (folder/'invoices'/rows[index]['filename']).read_bytes()
+        result = extract(pdf, fixtures=folder/'demo_fixtures.json')
+        doc = store.ingest(str(index), pdf, result)
+        fields = dict(result['fields'])
+        if index == 5:
+            fields['po_number'] = 'PO-VERIFIED-BY-REVIEWER'
+            store.review(doc, fields, 'save', 'Tester', 'Documented business resolution')
+            assert store.history(doc)[0]['before_fields'] != store.history(doc)[0]['after_fields']
+        store.review(doc, fields, 'approve', 'Tester', 'Local test source verification')
+    debt = aged_debt(store.documents(), [], date(2026,10,10))
+    original = next(r for r in debt if r['document_number']=='NC-0005')
+    assert original['credits'] == Decimal('-120.00')
+    assert len(debt) == 2
+
+def test_app_smoke(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    generate(tmp_path/'data')
+    import shutil
+    source = __import__('pathlib').Path(__file__).resolve().parents[1]/'app.py'
+    shutil.copyfile(source, tmp_path/'app.py')
+    app = AppTest.from_file(str(tmp_path/'app.py')).run(timeout=30)
+    assert not app.exception
+    next(b for b in app.button if b.label == 'Load 40 offline demo documents').click().run(timeout=30)
+    assert not app.exception
+    assert len(Store().documents()) == 40
+    assert len(app.text_input) == 14
+    next(t for t in app.text_input if t.label == 'Reviewer name').set_value('Test reviewer')
+    next(t for t in app.text_input if t.label == 'Correction / decision reason').set_value('Verified fictional source')
+    next(s for s in app.selectbox if s.label == 'Action').select('approve')
+    next(b for b in app.button if b.label == 'Save decision').click().run(timeout=30)
+    assert not app.exception
+    assert Store().documents()[0]['status'] == 'approved'

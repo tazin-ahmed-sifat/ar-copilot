@@ -66,6 +66,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python -m ar_copilot.generate
+python scripts/prepare_timing_documents.py  # required for the "Time a document" page
 python -m streamlit run app.py
 ```
 
@@ -76,6 +77,7 @@ python3 -m venv .venv
 source .venv/bin/activate          # Git Bash on Windows: source .venv/Scripts/activate
 python -m pip install -r requirements.txt
 python -m ar_copilot.generate
+python scripts/prepare_timing_documents.py  # required for the "Time a document" page
 python -m streamlit run app.py
 ```
 

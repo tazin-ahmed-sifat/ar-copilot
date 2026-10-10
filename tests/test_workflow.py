@@ -160,3 +160,9 @@ def test_summary_sheet_totals_are_traceable_formulas(corpus):
     assert formulas['B6'].find('m:f', NS).text == f'SUMIF(AgedDebt!$A$2:$A${len(debt) + 1},$A6,AgedDebt!$J$2:$J${len(debt) + 1})'
     grand_total = Decimal(formulas[f'G{total_row}'].find('m:v', NS).text)
     assert grand_total == sum(r['balance'] for r in debt)
+
+@pytest.mark.parametrize('days, bucket', [(-5, 'current'), (0, 'current'), (1, '1–30'), (30, '1–30'),
+                                          (31, '31–60'), (60, '31–60'), (61, '61–90'), (90, '61–90'), (91, '91+')])
+def test_bucket_boundaries(days, bucket):
+    from ar_copilot.core import bucket_for
+    assert bucket_for(days) == bucket

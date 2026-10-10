@@ -44,5 +44,6 @@ reported as such.
 ## Not covered locally
 
 - Opening the exported workbooks in Excel and running the Power Query: see [excel/README.md](../excel/README.md).
-- Anything in Microsoft 365: see [the build guide](microsoft365.md).
+- Microsoft 365 cloud behavior: the [manual OneDrive test](microsoft365_onedrive.md) was performed
+  separately; proposed safeguards and the [SharePoint/Teams extension](microsoft365.md) are not locally verified.
 - Browser-level upload and download clicks.

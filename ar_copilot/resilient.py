@@ -1,8 +1,8 @@
 """Paced Gemini evaluation that checkpoints after every step and can resume failed documents.
 
 A free-tier quota can stop a 40-document run part way through. Writing the report
-atomically after each attempt means an interrupted run loses nothing, and a resume
-calls the API only for documents that have not yet succeeded.
+atomically after each attempt preserves saved results. An interruption before the
+checkpoint can lose the latest response. Resume skips saved successful documents.
 """
 import csv
 import hashlib

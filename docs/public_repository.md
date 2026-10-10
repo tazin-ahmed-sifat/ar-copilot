@@ -7,3 +7,5 @@ Local secrets (.env and variants), SQLite review records, generated invoice data
 Before each push, inspect `git diff --cached --stat` and confirm `git check-ignore .env runtime/ar.sqlite`. Source commits use a GitHub noreply address rather than the personal address from the global Git configuration. The initial publication uses an explicit file allowlist and scans staged content for the exact configured secret without printing it, plus common token/private-key patterns. If a credential is ever committed, removing the file in a later commit is insufficient: revoke the credential and purge it from history before publishing.
 
 Raw reports stay local. The README cites only the metrics-only files in `results/`, which are regenerated from those reports by the scripts in `scripts/`.
+
+The release audit found a historical `.agents/skills/developing-with-streamlit` symlink containing a local filesystem path. It is absent from the current tree and ignored for future commits, but remains in history. See [release review](release_review.md) before publishing; no history has been rewritten.

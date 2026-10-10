@@ -21,3 +21,6 @@ data/
 credentials*.json
 # Office lock files while a workbook is open
 ~$*
+
+.agents/
+.codex/

@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 import zipfile
+from dotenv import dotenv_values
 from ar_copilot.config import ROOT, gemini_settings
 
 PUBLIC_DIRECTORIES = ['ar_copilot', 'excel', 'views', 'tests', 'scripts', 'docs', 'results', '.vscode', '.streamlit']
@@ -23,7 +24,7 @@ def is_publishable(path: Path) -> bool:
     A lock file (~$name.xlsx) exists only while Excel has the workbook open, and Windows
     refuses to let anything else read it.
     """
-    return ('__pycache__' not in path.parts and path.name != 'secrets.toml'
+    return (not path.is_symlink() and '__pycache__' not in path.parts and path.name != 'secrets.toml'
             and not path.name.startswith('~$'))
 
 
@@ -47,29 +48,33 @@ def audit():
                           if path.is_file() and is_publishable(path))
     candidates=sorted(set(candidates))
     key,_=gemini_settings()
+    private_values = [value for name, value in dotenv_values(ROOT / '.env').items()
+                      if name != 'GEMINI_MODEL' and value and len(value) >= 8]
+    if key:
+        private_values.append(key)
     patterns=[rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
               rb'gh[pousr]_[A-Za-z0-9]{20,}', rb'github_pat_[A-Za-z0-9_]{30,}',
               rb'AIza[A-Za-z0-9_-]{30,}', rb'AKIA[A-Z0-9]{16}']
     findings=[]
     for path in candidates:
-        if _leaks(path.read_bytes(), key, patterns):
+        if any(_leaks(path.read_bytes(), value, patterns) for value in private_values or ['']):
             findings.append(path.relative_to(ROOT).as_posix())
     if findings:
         raise SystemExit('Potential credential detected in these files (values withheld): '+', '.join(findings))
     env_example=(ROOT/'.env.example').read_text()
     if any(line.startswith('GEMINI_API_KEY=') and line.partition('=')[2].strip() for line in env_example.splitlines()):
         raise SystemExit('.env.example contains a nonempty credential field')
-    staged=subprocess.run(['git','-c',f'safe.directory={ROOT.as_posix()}', 'diff','--cached','--name-only'],cwd=ROOT,check=True,capture_output=True,text=True).stdout.splitlines()
+    staged=subprocess.run(['git','-c',f'safe.directory={ROOT.as_posix()}', 'diff','--cached','--name-only','--diff-filter=ACMRT'],cwd=ROOT,check=True,capture_output=True,text=True).stdout.splitlines()
     allowed={p.relative_to(ROOT).as_posix() for p in candidates}
     if set(staged)-allowed:
         raise SystemExit('Staged files outside publication allowlist: '+', '.join(sorted(set(staged)-allowed)))
     for filename in staged:
         content=subprocess.run(['git','-c',f'safe.directory={ROOT.as_posix()}', 'show',f':{filename}'],
             cwd=ROOT,check=True,capture_output=True).stdout
-        if _leaks(content, key, patterns):
+        if any(_leaks(content, value, patterns) for value in private_values or ['']):
             raise SystemExit('Potential credential found in staged content (value withheld): '+filename)
     print(json.dumps(dict(candidate_files=len(candidates),staged_files=len(staged),credential_findings=0,
-                         actual_key_compared_without_display=True),indent=2))
+                         configured_private_values_compared_without_display=True),indent=2))
 
 if __name__=='__main__':
     audit()

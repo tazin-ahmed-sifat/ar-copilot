@@ -5,7 +5,6 @@ gatherUsageStats = false
 toolbarMode = "minimal"
 
 # Ledger palette: cool paper, blue-black ink, steel-blue actions.
-# Status colours (green / amber / oxide red) are reused by the stamp badges in ar_copilot/ui.py.
 [theme]
 base = "light"
 primaryColor = "#2C5A88"

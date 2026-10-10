@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from ar_copilot.core import FIELDS, validate
-from ar_copilot.ui import (FIELD_LABELS, STAMPS, amount, check_messages, display_date, heading_with_stamp,
+from ar_copilot.ui import (FIELD_LABELS, STAMPS, amount, check_messages, display_date, heading_with_status,
                            open_store, show_pdf)
 
 FILTERS = {'review': 'Needs review', 'approved': 'Approved', 'rejected': 'Rejected', 'all': 'All'}
@@ -56,7 +56,7 @@ def show_checks(record: dict, extraction: dict) -> None:
     if problems:
         st.warning('**Fix before approving**\n\n' + '\n'.join(f'- {p}' for p in problems))
     elif record['status'] == 'approved':
-        st.success('Approved and posted. Posted documents are locked.')
+        st.success('Approved in the local register. Approved documents are locked.')
     else:
         st.success('All checks pass. A reviewer still has to approve it.')
 
@@ -96,7 +96,7 @@ def apply_decision(store, record: dict, visible: list[dict], action: str, fields
     try:
         store.review(record['id'], fields, action, reviewer, reason)
     except sqlite3.IntegrityError:
-        st.error('Already posted: another approved document has the same supplier, customer, type and number.')
+        st.error('Duplicate approval: another approved document has the same supplier, customer, type and number.')
         return
     except ValueError as exc:
         st.error(str(exc))
@@ -146,7 +146,7 @@ queue = st.dataframe(queue_table(visible), key=table_key, on_select='rerun', sel
 
 record = choose_document(visible, queue.selection.rows)
 extraction = json.loads(record['extraction'])
-heading_with_stamp(record.get('document_number') or record['filename'], record['status'])
+heading_with_status(record.get('document_number') or record['filename'], record['status'])
 source = 'offline fixtures' if extraction['mode'] == 'demo' else f"Gemini ({extraction.get('model') or 'model unknown'})"
 st.caption(f"{record['filename']}, extracted from {source} in {extraction['seconds']:.2f} s.")
 

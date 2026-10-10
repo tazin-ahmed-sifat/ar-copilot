@@ -10,14 +10,13 @@ import streamlit as st
 from ar_copilot.extract import extract
 from ar_copilot.payments import parse_payment_csv
 from ar_copilot.store import Store
-from ar_copilot.ui import apply_base_styles, data_dir, open_store
+from ar_copilot.ui import data_dir, open_store
 
 MAX_PDF_BYTES = 10 * 1024 * 1024
 DEMO_DOCUMENTS = 40
 MODES = {'demo': 'Offline fixtures', 'gemini': 'Gemini'}
 
 st.set_page_config(page_title='AR Copilot', page_icon=':material/receipt_long:', layout='wide')
-apply_base_styles()
 
 
 def load_demo(store: Store) -> None:
@@ -97,7 +96,7 @@ with st.sidebar:
         import_payments(store, ledger)
 
     st.divider()
-    st.caption('Fictional data for Northbridge Auto Components Ltd. Microsoft 365 is not connected.')
+    st.caption('Fictional data for Northbridge Auto Components Ltd. The OneDrive email flow is configured separately.')
 
 if 'flash' in st.session_state:
     st.toast(st.session_state.pop('flash'))

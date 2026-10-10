@@ -5,8 +5,9 @@ supplier. It reads invoice PDFs, extracts their fields with Gemini, checks them 
 business rules, and puts every document in front of a person to approve, correct or reject.
 Approved invoices and imported payments become an aged-debt report and an Excel workbook.
 
-All companies, documents and payments are invented. Nothing here posts to an accounting
-system or sends a message.
+The app uses fictional companies, documents and payments and does not post to an accounting
+system. A separate manual Power Automate flow reads a Brunel OneDrive workbook and emails
+the account owner; its verified scope and remaining safeguards are documented below.
 
 ![Review queue: the PDF beside its extracted fields, with failed checks listed above the form](docs/images/review-queue.png)
 
@@ -16,10 +17,10 @@ system or sends a message.
 - **Checks** each document: required fields, known customer, GBP, date order, net + VAT = total, VAT at 20%,
   and negative amounts plus a linked invoice for credit notes.
 - **Queues everything for review.** A passing document still needs a named reviewer. Approval locks it,
-  every decision is logged, and the same invoice can't be posted twice, even from a different PDF.
+  every decision is logged, and a SQLite business-key constraint prevents duplicate approvals.
 - **Ages the debt** at any reporting date, applying payments and linked credits, and exports a styled
   workbook with a formula-driven summary sheet, a chart and a [Power Query rebuild](excel/README.md).
-- **Measures itself.** An evaluator scores extraction against printed ground truth. A timing page records
+- **Evaluation and timing.** An evaluator scores extraction against printed ground truth. A timing page records
   how long a document takes to key by hand and through the assisted flow.
 
 ![Aged debt: headline figures, balances by customer and age, and the invoice table](docs/images/aged-debt.png)
@@ -39,7 +40,9 @@ flowchart LR
     DB --> AGING[Aged debt<br/>core.aged_debt]
     AGING --> XLSX[Excel workbook]
     XLSX --> PQ[Power Query rebuild]
-    XLSX -.->|not yet built| M365[SharePoint, Power Automate, Teams]
+    XLSX -->|manual upload| OD[Brunel OneDrive]
+    OD --> FLOW[Manual Power Automate flow<br/>Excel rows to own email]
+    XLSX -.->|planned, unbuilt| M365[SharePoint and Teams extension]
 ```
 
 | Path | Role |
@@ -99,7 +102,8 @@ Extraction was measured on 10 October 2026 with `gemini-3.8-flash`, scoring exac
 | Credit notes completed | 0/1: unassessed due to API failure | none in sample |
 | Median latency, completed documents | 5.95 s (n=4) | 5.05 s (n=3) |
 
-Every document goes to the review queue whatever happens, so the failures held nothing up unchecked. The
+The evaluator records API failures separately from extraction mistakes; it does not populate the app
+review queue. In the app, uploaded documents require review even when extraction fails. The
 four completed documents cover all three layouts, but rate limits stopped the run before it reached the two
 anomalies and the credit note.
 
@@ -131,17 +135,25 @@ To re-run the paced evaluation and refresh `results/`, see [retry and resume](do
 
 - **A person approves every document.** Extraction only proposes values. Passing every check doesn't skip review,
   because the checks can't tell a well-formed wrong value from a right one.
-- **Money is Decimal end to end.** Amounts become floats only when written to Excel, so totals don't drift by a penny.
-- **One business document posts once.** The posting key (supplier, customer, type, number) has a unique constraint
+- **Decimal calculations.** Validation and aging use Decimal; chart, table and Excel display values use floats.
+- **Duplicate approvals are blocked locally.** The business key (supplier, customer, type, number) has a unique constraint
   in SQLite, so a re-sent invoice with different PDF bytes is still rejected as a duplicate.
 - **Decisions are append-only.** The field update and its history row are written in one transaction.
 - **Strict scoring.** Exact string match with no date or spacing normalisation. Failed calls count against overall
   accuracy, and completion is reported separately, so an outage can't pass for good extraction.
-- **Interrupted runs lose nothing.** The evaluator checkpoints atomically after every call and resumes only failed documents.
+- **Resumable evaluation.** Atomic checkpoints preserve saved successes and resume failed or pending documents.
+  An interruption before a checkpoint can lose the latest response; provider calls are not exactly-once.
 - **Only text goes to Gemini**, never the PDF file. The prompt treats the document as untrusted data, and provider
   error text is never stored, because it can echo request details.
-- **The workbook explains itself.** Summary totals are SUMIF formulas over the AgedDebt rows, and the Power Query
+- **Traceable workbook totals.** Summary totals are SUMIF formulas over the AgedDebt rows, and the Power Query
   script rebuilds the buckets independently, checked against a [hand-computed fixture](excel/fixture).
+
+## Development and verification
+
+Code, tests and documentation include Codex-assisted development and review. The manual Microsoft 365
+flow was built and tested separately in the university account; it is not provisioned by this repository.
+Screenshots show an earlier offline demo session, not evidence of live extraction accuracy.
+See the [release review](docs/release_review.md) for audit scope and remaining checks.
 
 ## More
 

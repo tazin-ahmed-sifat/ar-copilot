@@ -1,5 +1,4 @@
-"""Shared Streamlit presentation: status stamps, plain-language check messages and PDF rendering."""
-import html
+"""Shared Streamlit presentation: status labels, plain-language check messages and PDF rendering."""
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -30,27 +29,6 @@ CHECK_MESSAGES = {
     'sign': 'Credit notes need negative amounts; invoices need positive ones.',
 }
 
-_CSS = """
-<style>
-  /* Amounts and durations line up in columns. */
-  [data-testid="stMetricValue"], [data-testid="stDataFrame"], .ar-figures { font-variant-numeric: tabular-nums; }
-  .ar-stamp {
-    display: inline-block; padding: 0.1rem 0.55rem; border: 2px solid currentColor; border-radius: 0.25rem;
-    outline: 1px solid currentColor; outline-offset: 2px; transform: rotate(-2deg);
-    font-family: "IBM Plex Sans Condensed", sans-serif; font-weight: 600; font-size: 0.85rem; line-height: 1.4;
-    letter-spacing: 0.02em; vertical-align: middle; margin-left: 0.6rem;
-  }
-  .ar-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem; margin: 0.25rem 0 0.1rem; }
-  .ar-heading h3 { margin: 0; padding: 0; }
-  .ar-muted { color: #5A6670; font-size: 0.9rem; }
-</style>
-"""
-
-
-def apply_base_styles() -> None:
-    st.html(_CSS)
-
-
 def open_store() -> Store:
     # Resolved on every call so tests can point config.ROOT at a temporary dataset.
     return Store(config.ROOT / 'runtime' / 'ar.sqlite')
@@ -60,13 +38,9 @@ def data_dir() -> Path:
     return config.ROOT / 'data'
 
 
-def stamp(status: str) -> str:
-    label, colour = STAMPS.get(status, (status.title(), '#5A6670'))
-    return f'<span class="ar-stamp" style="color:{colour}">{html.escape(label)}</span>'
-
-
-def heading_with_stamp(title: str, status: str) -> None:
-    st.html(f'<div class="ar-heading"><h3>{html.escape(title)}</h3>{stamp(status)}</div>')
+def heading_with_status(title: str, status: str) -> None:
+    st.subheader(title)
+    st.caption(STAMPS.get(status, (status.title(), ''))[0])
 
 
 def check_messages(codes: list[str]) -> list[str]:
@@ -101,7 +75,7 @@ def gbp(value: Decimal | float) -> str:
 
 @st.cache_data(max_entries=40, show_spinner=False)
 def pdf_page_images(pdf_bytes: bytes, zoom: float = 1.5) -> list[bytes]:
-    """Render each page to PNG once; returning to the same document is instant."""
+    """Cache rendered PDF pages for repeat views."""
     with fitz.open(stream=pdf_bytes, filetype='pdf') as pdf:
         return [page.get_pixmap(matrix=fitz.Matrix(zoom, zoom)).tobytes('png') for page in pdf]
 

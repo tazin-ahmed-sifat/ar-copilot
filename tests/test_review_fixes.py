@@ -95,3 +95,10 @@ def test_audit_sees_inside_zip_based_files():
         archive.writestr('xl/sharedStrings.xml', 'FAKE-SECRET-VALUE ' * 50)
     assert b'FAKE-SECRET-VALUE' not in buffer.getvalue()  # compressed, invisible to a raw scan
     assert _leaks(buffer.getvalue(), 'FAKE-SECRET-VALUE', [])
+
+
+def test_audit_skips_office_lock_files():
+    from scripts.audit_public_files import is_publishable
+    assert not is_publishable(Path('excel/fixture/~$aged_debt_fixture.xlsx'))
+    assert not is_publishable(Path('ar_copilot/__pycache__/core.cpython-312.pyc'))
+    assert is_publishable(Path('excel/fixture/aged_debt_fixture.xlsx'))

@@ -17,6 +17,16 @@ from ar_copilot.config import ROOT, gemini_settings
 PUBLIC_DIRECTORIES = ['ar_copilot', 'excel', 'views', 'tests', 'scripts', 'docs', 'results', '.vscode', '.streamlit']
 PUBLIC_FILES = ['app.py', 'README.md', 'requirements.txt', 'requirements.lock.txt', '.gitignore', '.env.example']
 
+def is_publishable(path: Path) -> bool:
+    """Files in an allowed directory, minus caches, local secrets and Office lock files.
+
+    A lock file (~$name.xlsx) exists only while Excel has the workbook open, and Windows
+    refuses to let anything else read it.
+    """
+    return ('__pycache__' not in path.parts and path.name != 'secrets.toml'
+            and not path.name.startswith('~$'))
+
+
 def _searchable(content: bytes) -> bytes:
     """Raw bytes plus, for zip-based files such as .xlsx, every decompressed member."""
     if not zipfile.is_zipfile(io.BytesIO(content)):
@@ -33,9 +43,8 @@ def _leaks(content: bytes, key: str, patterns: list[bytes]) -> bool:
 def audit():
     candidates = [ROOT/p for p in PUBLIC_FILES]
     for directory in PUBLIC_DIRECTORIES:
-        candidates.extend(path for path in (ROOT/directory).rglob('*') if path.is_file()
-                          and '__pycache__' not in path.parts
-                          and path.name != 'secrets.toml')
+        candidates.extend(path for path in (ROOT/directory).rglob('*')
+                          if path.is_file() and is_publishable(path))
     candidates=sorted(set(candidates))
     key,_=gemini_settings()
     patterns=[rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',

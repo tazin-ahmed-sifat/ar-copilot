@@ -4,26 +4,33 @@ A local Python learning prototype for **fictional** Northbridge Auto Components 
 
 Public repository users: generated datasets, review databases, raw reports and exports are intentionally local and excluded from Git. Create a virtual environment, install requirements, and generate data using the fresh-installation commands below. See [public repository exclusions](docs/public_repository.md) and [retry/resume behavior and current quota stop](docs/retry_resume.md).
 
-## Launch on Windows
+## Setup
 
-Open this workspace in PowerShell. The virtual environment and dataset have already been created locally.
+Requires Python 3.12. Create and activate a virtual environment, install dependencies and generate the fictional dataset.
 
-```powershell
-.\.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-Open http://localhost:8501. Choose **Load 40 offline demo documents** in the sidebar, then review documents one at a time. Enter a reviewer name and decision reason. Approve valid invoices; fix or reject the missing-PO and inconsistent-total documents. Approve NC-0005 before approving its linked credit NC-0040. Upload `data/payments.csv` in the sidebar and click Import payments. Use the aged-debt tab to change the reporting date and download Excel workbooks. Every document starts in human review, even when validation passes. Posted documents are locked.
-
-For a fresh installation:
+PowerShell (Windows):
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m ar_copilot.generate
-.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m ar_copilot.generate
+python -m pytest -q
 ```
 
-`requirements.lock.txt` records the exact tested environment. VS Code: Terminal → Run Task → Generate fictional data / Run AR Copilot / Run meaningful tests. Paths in tasks target Windows; use `.venv/bin/python` on Unix.
+bash / zsh (macOS, Linux, Git Bash):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate     # Git Bash on Windows: source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+python -m ar_copilot.generate
+python -m pytest -q
+```
+
+With the environment active, every later command is the same in both shells. Start the app with `python -m streamlit run app.py` and open http://localhost:8501. `requirements.lock.txt` records the exact tested environment. In VS Code, Terminal → Run Task offers the same commands on any OS.
+
+Choose **Load 40 offline demo documents** in the sidebar, then review documents one at a time. Enter a reviewer name and decision reason. Approve valid invoices; fix or reject the missing-PO and inconsistent-total documents. Approve NC-0005 before approving its linked credit NC-0040. Upload `data/payments.csv` in the sidebar and click Import payments. Use the aged-debt tab to change the reporting date and download Excel workbooks. Every document starts in human review, even when validation passes. Posted documents are locked.
 
 ## Data and architecture
 
@@ -56,14 +63,14 @@ Uses the official `google-genai` SDK, not the retired `google-generativeai` pack
 
 For a fresh installation, copy `.env.example` to `.env` locally and set `GEMINI_API_KEY`; alternatively set that environment variable. Never paste keys into chat or commit them. `.env` and `.venv` are ignored. `GEMINI_MODEL` defaults to `gemini-3.8-flash` (set in `ar_copilot/config.py`); `--model` overrides it for a single CLI run. List the models your key can use with `python -m ar_copilot.evaluate --list-models`. Provider availability, quotas, cost and model behavior depend on the account and time of testing. Gemini mode sends PDF **text**, not PDF bytes, to Google only on processing. Do not upload sensitive real invoices to this unauthenticated prototype.
 
-```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode gemini --sample full --model gemini-3.8-flash
+```
+python -m ar_copilot.evaluate --mode gemini --sample full --model gemini-3.8-flash
 ```
 
 Evaluation writes a unique JSON report under `reports/gemini/`: raw per-field exact printed-string matches, document accuracy (all 12 fields), errors, model, processing seconds, validation document detection/missed/false-positive/true-negative counts and missed expected rules. Empty and null are equivalent missing values on successful extractions; extraction failures receive no field matches. Date/spacing normalization is deliberately not applied, so exact-match metrics are strict. API failures count as failed extraction and review flags; inspect details to distinguish validator detections from provider failures. A single API run is not statistically representative.
 
-```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode demo
+```
+python -m ar_copilot.evaluate --mode demo
 ```
 
 Offline reports are explicitly **fixture checks, not measured Gemini accuracy**. They test plumbing and validation; fixtures encode truth and say nothing about AI quality. Actual perf_counter durations are recorded; no time-saving claim is made. Do not combine demo and Gemini denominators.

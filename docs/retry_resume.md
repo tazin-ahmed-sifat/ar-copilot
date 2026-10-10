@@ -6,11 +6,11 @@ The resilient evaluator makes sequential requests, with configurable minimum sta
 
 Atomic JSON checkpoints are written before processing, after each attempt and after every document. Successful extractions are reused even if they contain accounting anomalies or mismatches. Only failed/pending documents are called again. Resume validates document identity, printed ground truth and PDF hashes (legacy reports use extracted-text checks). Every resume creates a new file and preserves its source report. Previous results and retry attempts remain auditable. An interrupted call may have reached Google before its result was checkpointed; exactly-once API execution cannot be guaranteed across process termination. Run only one evaluator per checkpoint.
 
-```powershell
+```
 # Fresh resilient full run
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode gemini --resilient --model gemini-3.8-flash --pace 12
+python -m ar_copilot.evaluate --mode gemini --resilient --model gemini-3.8-flash --pace 12
 # Retry one failed/pending document using a previously generated report
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode gemini --model gemini-3.8-flash --resume reports/gemini/YOUR_REPORT.json --limit 1 --pace 12
+python -m ar_copilot.evaluate --mode gemini --model gemini-3.8-flash --resume reports/gemini/YOUR_REPORT.json --limit 1 --pace 12
 ```
 
 Use --max-attempts, --base-delay, --max-delay and --max-wait to configure bounded retry behavior. Completion rate, field/document accuracy among completed extractions and overall accuracy including failed/pending documents are distinct. Failed API outputs never enter accounting-anomaly counts. Previously unclassified API errors remain explicitly legacy_unclassified.

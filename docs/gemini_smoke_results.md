@@ -14,8 +14,8 @@ The later full run attempted all 40 documents but returned four successful extra
 
 Use the successful model explicitly rather than the default that returned 404:
 
-```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode gemini --sample full --model gemini-3.8-flash
+```
+python -m ar_copilot.evaluate --mode gemini --sample full --model gemini-3.8-flash
 ```
 
 This makes 40 sequential requests, records raw comparisons and actual timings under `reports/gemini/`, and checks the review database is unchanged. The corpus includes the missing PO, inconsistent printed total and linked credit note. Network access and account quota must permit the requests. Do not rerun until the observed API failures and available quotas have been reviewed.

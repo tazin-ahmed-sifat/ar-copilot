@@ -18,8 +18,8 @@ This removes inherited permissions and grants your account access. Review explic
 
 5. Check configuration without displaying the key:
 
-```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --check-config
+```
+python -m ar_copilot.evaluate --check-config
 ```
 
 Expect `key_configured: true`. The check prints only presence and the model, never the credential. Process `GEMINI_API_KEY`/`GEMINI_MODEL` variables take precedence over `.env`; stale process variables must be cleared locally if you intend to use the file. `GOOGLE_API_KEY` is deliberately not used by this app, because the client receives the configured Gemini key explicitly. The app reads this exact workspace file on each Gemini extraction, so saving the key does not require regenerating documents or clearing the database.
@@ -30,8 +30,8 @@ Expect `key_configured: true`. The check prints only presence and the model, nev
 
 After saving, tell the assistant **“The key is saved locally”** without including the key. The authorized next action is:
 
-```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode gemini --sample per-layout
+```
+python -m ar_copilot.evaluate --mode gemini --sample per-layout
 ```
 
 This reads NC-0001, NC-0002 and NC-0003 (layouts 1, 2 and 3). It sends their extracted text to Gemini, not the reference answers, and compares the actual structured fields afterward. There is no offline fallback. The model is configurable; account access to the default model must be verified by this call.
@@ -44,8 +44,8 @@ Smoke-test success means all three requests succeed, every printed field matches
 
 The successful smoke-test report sets `full_evaluation_ready: true` and prints:
 
-```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode gemini --sample full
+```
+python -m ar_copilot.evaluate --mode gemini --sample full
 ```
 
 This is 40 sequential requests with a 60-second per-request timeout. There is no automatic retry or rate-limit bypass. Quota/model/authentication/network errors are recorded and reported; no accuracy is invented. Report files are unique under `reports/gemini/`. Offline CLI runs go to `reports/demo/`; historical `reports/evaluation_demo.json` remains explicitly labelled fixtures. Never aggregate those results into Gemini accuracy. Full evaluation is prepared, not automatically launched by the smoke test.

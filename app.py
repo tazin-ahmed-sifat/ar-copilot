@@ -113,5 +113,5 @@ with debt_tab:
         st.warning('These payments have no approved matching invoice and are excluded from aged debt.')
         st.dataframe(unmatched)
     for kind, label in [('posted', 'Power Automate document table'), ('debt', 'Aged debt workbook')]:
-        st.download_button(label, workbook(records, debt, reporting_date, kind, store.payments()), f'ar_{kind}.xlsx',
+        st.download_button(label, workbook(records, debt, reporting_date, kind, store.payments()), f'ar_{kind}_{reporting_date.isoformat()}.xlsx',
                            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

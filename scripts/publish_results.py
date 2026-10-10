@@ -84,7 +84,8 @@ def render_markdown(summary: dict) -> str:
     documents = summary['documents']
     completed = summary['completion']['completed']
     counts = summary['counts']
-    failures = ', '.join(f'{n} × HTTP {code}' for code, n in summary['completion']['failures_by_http_status'].items())
+    failures = ', '.join(f'{n} × ' + ('no HTTP status' if code == 'None' else f'HTTP {code}')
+                         for code, n in summary['completion']['failures_by_http_status'].items())
     anomalies = summary['accounting_anomalies']
     latency = summary['latency_seconds_completed']
     latency_text = 'n/a'

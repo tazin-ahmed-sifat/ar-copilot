@@ -34,12 +34,14 @@ COLUMNS = [f.name for f in fields(Timing)]
 
 
 def count_field_errors(entered: dict[str, str], truth: dict[str, str]) -> int:
-    """Score with the same exact-string rule as the extraction evaluation."""
+    """Exact match against the printed value, as in the extraction evaluation, except that stray
+    spaces around a typed value are forgiven: they are a keystroke slip, not a wrong field."""
     return sum((entered.get(f) or '').strip() != (truth.get(f) or '') for f in FIELDS)
 
 
 def count_corrections(extracted: dict[str, str | None], final: dict[str, str]) -> int:
-    return sum((extracted.get(f) or '') != (final.get(f) or '') for f in FIELDS)
+    """Fields the reviewer changed from the extracted value, ignoring stray outer spaces."""
+    return sum((extracted.get(f) or '').strip() != (final.get(f) or '').strip() for f in FIELDS)
 
 
 def append_timing(timing: Timing, path: Path | None = None) -> None:

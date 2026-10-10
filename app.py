@@ -49,7 +49,15 @@ def extract_uploads(store: Store, uploads, mode: str) -> None:
         document_id = store.ingest(upload.name, pdf, extract(pdf, mode, data_dir() / 'demo_fixtures.json'))
         known.add(digest)
         st.sidebar.success(f'{upload.name} added to the review queue.')
-        st.session_state['selected_document'] = document_id
+        show_in_queue(document_id)
+
+
+def show_in_queue(document_id: int) -> None:
+    """Open a new document in the review queue, whatever filter or row was selected before."""
+    st.session_state['selected_document'] = document_id
+    st.session_state['queue_filter'] = 'review'
+    # A new table key drops the old row selection, which would otherwise win over selected_document.
+    st.session_state['queue_version'] = st.session_state.get('queue_version', 0) + 1
 
 
 def import_payments(store: Store, ledger) -> None:

@@ -20,13 +20,19 @@ def headline_figures(debt: list[dict]) -> None:
     columns[0].metric('Outstanding', gbp(outstanding))
     columns[1].metric('Overdue', gbp(overdue))
     columns[2].metric('Over 90 days', gbp(oldest))
-    columns[3].metric('Open invoices', sum(r['balance'] != 0 for r in debt))
+    # Overpaid invoices are customer credits, not open debts.
+    columns[3].metric('Open invoices', sum(r['balance'] > 0 for r in debt))
 
 
-def bucket_chart(debt: list[dict]) -> alt.Chart:
-    """Stacked bars per customer, one blue step per bucket so older debt reads darker."""
+def bucket_chart(debt: list[dict]) -> alt.Chart | None:
+    """Stacked bars per customer, one blue step per bucket so older debt reads darker.
+
+    Returns None when every balance is zero, since there is nothing to draw.
+    """
     rows = [{'Customer': r['customer'], 'Age': label, 'Order': index, 'Balance': float(r[bucket])}
             for r in debt for index, (bucket, label) in enumerate(zip(BUCKETS, BUCKET_LABELS)) if r[bucket]]
+    if not rows:
+        return None
     frame = pd.DataFrame(rows).groupby(['Customer', 'Age', 'Order'], as_index=False)['Balance'].sum()
     customers = sorted(frame['Customer'].unique())
     return (
@@ -84,7 +90,11 @@ debt = aged_debt(records, payments, reporting_date)
 if debt:
     headline_figures(debt)
     st.subheader('Balance by customer and age')
-    st.altair_chart(bucket_chart(debt), width='stretch')
+    chart = bucket_chart(debt)
+    if chart is None:
+        st.caption('Every approved invoice is settled at this date.')
+    else:
+        st.altair_chart(chart, width='stretch')
     st.subheader('Invoices')
     invoice_table(debt)
 else:

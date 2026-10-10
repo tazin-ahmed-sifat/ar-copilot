@@ -7,13 +7,28 @@ if not __package__:
     # `ar_copilot` imports the same way it does under `python -m scripts.<name>`.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import io
 import json
 import re
 import subprocess
+import zipfile
 from ar_copilot.config import ROOT, gemini_settings
 
 PUBLIC_DIRECTORIES = ['ar_copilot', 'excel', 'views', 'tests', 'scripts', 'docs', 'results', '.vscode', '.streamlit']
 PUBLIC_FILES = ['app.py', 'README.md', 'requirements.txt', 'requirements.lock.txt', '.gitignore', '.env.example']
+
+def _searchable(content: bytes) -> bytes:
+    """Raw bytes plus, for zip-based files such as .xlsx, every decompressed member."""
+    if not zipfile.is_zipfile(io.BytesIO(content)):
+        return content
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        return content + b''.join(archive.read(name) for name in archive.namelist())
+
+
+def _leaks(content: bytes, key: str, patterns: list[bytes]) -> bool:
+    content = _searchable(content)
+    return bool(key and key.encode() in content) or any(re.search(p, content) for p in patterns)
+
 
 def audit():
     candidates = [ROOT/p for p in PUBLIC_FILES]
@@ -28,8 +43,7 @@ def audit():
               rb'AIza[A-Za-z0-9_-]{30,}', rb'AKIA[A-Z0-9]{16}']
     findings=[]
     for path in candidates:
-        content=path.read_bytes()
-        if (key and key.encode() in content) or any(re.search(p,content) for p in patterns):
+        if _leaks(path.read_bytes(), key, patterns):
             findings.append(path.relative_to(ROOT).as_posix())
     if findings:
         raise SystemExit('Potential credential detected in these files (values withheld): '+', '.join(findings))
@@ -43,7 +57,7 @@ def audit():
     for filename in staged:
         content=subprocess.run(['git','-c',f'safe.directory={ROOT.as_posix()}', 'show',f':{filename}'],
             cwd=ROOT,check=True,capture_output=True).stdout
-        if (key and key.encode() in content) or any(re.search(p,content) for p in patterns):
+        if _leaks(content, key, patterns):
             raise SystemExit('Potential credential found in staged content (value withheld): '+filename)
     print(json.dumps(dict(candidate_files=len(candidates),staged_files=len(staged),credential_findings=0,
                          actual_key_compared_without_display=True),indent=2))

@@ -19,6 +19,9 @@ from ar_copilot.core import FIELDS
 from ar_copilot.resilient import metrics
 
 RESULTS = ROOT / 'results'
+# Output name and table title per evaluation sample.
+OUTPUTS = {'full': ('gemini_summary', 'Gemini extraction results'),
+           'per-layout': ('gemini_smoke_summary', 'Gemini smoke test: one document per layout')}
 FIELD_COUNT = len(FIELDS)
 
 
@@ -30,12 +33,15 @@ def load_expected_anomalies() -> dict[str, set[str]]:
 def public_summary(report: dict, expected: dict[str, set[str]]) -> dict:
     """Return run metadata and metrics, never per-document content."""
     details = report['details']
-    result = metrics(details, expected)
+    # Only anomalies inside this run count; a three-document smoke test never saw the others.
+    in_run = {r['filename'] for r in details}
+    result = metrics(details, {name: rules for name, rules in expected.items() if name in in_run})
     failures = result.pop('api_failures')
     completed = [r for r in details if not r['error']]
     completed_seconds = [r['seconds'] for r in completed]
     return {
         'source_run': report['run_id'],
+        'sample': report.get('sample', 'full'),
         'models': sorted({r['model'] for r in details if r.get('model')}),
         'documents': result['documents'],
         'completion': {
@@ -89,6 +95,10 @@ def render_markdown(summary: dict) -> str:
     latency_text = 'n/a'
     if latency['n']:
         latency_text = f"{latency['median']:.2f} (range {latency['min']:.2f}–{latency['max']:.2f}, n={latency['n']})"
+    anomaly_text = 'none in this sample'
+    if anomalies['expected']:
+        anomaly_text = (f"{anomalies['rules_detected']}/{anomalies['expected']}"
+                        f" ({anomalies['unassessed']} unassessed: extraction failed)")
     rows = [
         ('Documents attempted', str(documents)),
         ('Completion rate (API returned a result)', _ratio(completed, documents)),
@@ -97,13 +107,12 @@ def render_markdown(summary: dict) -> str:
         ('Document accuracy on completed documents', _ratio(counts['exact_documents'], completed)),
         ('Field accuracy overall (failures count as wrong)', _ratio(counts['correct_fields'], documents * FIELD_COUNT)),
         ('Document accuracy overall', _ratio(counts['exact_documents'], documents)),
-        ('Intentional anomalies caught by rules', f"{anomalies['rules_detected']}/{anomalies['expected']}"
-                                                   f" ({anomalies['unassessed']} unassessed: extraction failed)"),
+        ('Intentional anomalies caught by rules', anomaly_text),
         ('Rule false positives on completed documents', str(anomalies['false_positives'])),
         ('Median extraction latency, completed (s)', latency_text),
     ]
     lines = [
-        '# Gemini extraction results',
+        f"# {OUTPUTS[summary['sample']][1]}",
         '',
         f"Run `{summary['source_run']}`, model {', '.join(summary['models'])}, "
         f"{documents} fictional documents, exact string match on {FIELD_COUNT} fields.",
@@ -119,16 +128,17 @@ def render_markdown(summary: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('report', type=Path, help='raw full or resilient report under reports/gemini/')
+    parser.add_argument('report', type=Path, help='raw full, resilient or per-layout report under reports/gemini/')
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
-    if report.get('mode') != 'gemini' or report.get('sample') != 'full':
-        raise SystemExit('Only full Gemini runs are published; demo fixture checks are not accuracy.')
+    if report.get('mode') != 'gemini' or report.get('sample') not in OUTPUTS:
+        raise SystemExit('Only Gemini runs are published; demo fixture checks are not accuracy.')
     summary = public_summary(report, load_expected_anomalies())
     RESULTS.mkdir(exist_ok=True)
-    (RESULTS / 'gemini_summary.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
-    (RESULTS / 'gemini_summary.md').write_text(render_markdown(summary), encoding='utf-8')
-    print('Wrote results/gemini_summary.json and results/gemini_summary.md')
+    name = OUTPUTS[summary['sample']][0]
+    (RESULTS / f'{name}.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
+    (RESULTS / f'{name}.md').write_text(render_markdown(summary), encoding='utf-8')
+    print(f'Wrote results/{name}.json and results/{name}.md')
 
 
 if __name__ == '__main__':

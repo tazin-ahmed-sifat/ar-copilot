@@ -1,5 +1,6 @@
 {
   "source_run": "20261010T172639466799Z",
+  "sample": "full",
   "models": [
     "gemini-3.8-flash"
   ],

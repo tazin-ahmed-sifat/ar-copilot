@@ -49,3 +49,12 @@ def test_markdown_table_shows_counts_for_each_denominator():
     assert '| Field accuracy on completed documents | 12/12 (100.0%) |' in table
     assert '| Field accuracy overall (failures count as wrong) | 12/24 (50.0%) |' in table
     assert '1 × HTTP 503' in table
+
+def test_smoke_summary_only_counts_anomalies_in_the_run():
+    from scripts.publish_results import public_summary, render_markdown
+    details = [dict(filename='a.pdf', model='mock', error=None, error_code=None, seconds=1.0,
+                    validation=[], matches={f: True for f in FIELDS})]
+    summary = public_summary(dict(run_id='mock', sample='per-layout', details=details),
+                             {'elsewhere.pdf': {'totals'}})
+    assert summary['accounting_anomalies']['expected'] == 0
+    assert render_markdown(summary).startswith('# Gemini smoke test')

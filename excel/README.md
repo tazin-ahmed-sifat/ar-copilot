@@ -6,8 +6,9 @@ aged-debt workbook contains: the `PostedReceivables` and `Payments` tables and t
 `ar_copilot.core.aged_debt`, so a finance user can recalculate the buckets for a new
 date without Python.
 
-Status: written against the exported table layout; not yet run in Excel. The fixture
-below is how to confirm it.
+Status: verified in Excel against the fixture on 10 October 2026.
+AgedDebtCheck returned zero differences. AgedDebtPQ contained nine rows,
+excluded FX-09, and showed FX-08 with a balance of -£40.00.
 
 ## Fixture
 
@@ -34,16 +35,30 @@ python scripts/build_excel_fixture.py
 
 ## Run and compare in Excel
 
-1. Open `fixture/aged_debt_fixture.xlsx` in Excel for Windows or Mac (Microsoft 365).
-2. **Data → Get Data → From Other Sources → Blank Query**. In the Power Query editor choose
-   **Advanced Editor**, replace the contents with `aged_debt.pq`, and name the query `AgedDebtPQ`.
-3. Add a second blank query from `aged_debt_check.pq` and name it `AgedDebtCheck`.
-4. **Close & Load To… → Table → New worksheet** for both.
-5. `AgedDebtCheck` should load with no rows. Any row it shows is a document where Power Query
-   and Python disagree, with both versions side by side.
-6. Cross-check `AgedDebtPQ` against `fixture/expected_aged_debt.csv`: nine rows, FX-09 absent,
-   FX-08 at −£40.00.
+1. Open `fixture/aged_debt_fixture.xlsx` in Excel desktop.
 
-To age the same data at another date, change Summary!B2 and choose **Data → Refresh All**.
-`AgedDebtPQ` follows the new date; the AgedDebt sheet is a Python snapshot and does not, so
-`AgedDebtCheck` will then list differences by design.
+2. Choose **Data → Get Data → From Other Sources → Blank Query**.
+   Open **Advanced Editor**, replace its contents with `aged_debt.pq`,
+   and name the query `AgedDebtPQ`.
+   Choose **Close & Load To… → Table → New worksheet**.
+
+3. Create another blank query. In **Advanced Editor**, paste the contents
+   of `aged_debt_python_source.pq` and name it `AgedDebtPythonSource`.
+   Choose **Close & Load To… → Only Create Connection**.
+   This separates workbook access from the comparison query to avoid
+   the Formula.Firewall error.
+
+4. Create a third blank query using `aged_debt_check.pq` and name it
+   `AgedDebtCheck`.
+   Choose **Close & Load To… → Table → New worksheet**.
+
+5. `AgedDebtCheck` should load with no data rows. Any row indicates a
+   difference between Power Query and Python, shown side by side.
+
+6. Cross-check `AgedDebtPQ` against `fixture/expected_aged_debt.csv`:
+   nine data rows, FX-09 absent, and FX-08's balance at -£40.00.
+
+To age the same data at another date, change `Summary!B2` and choose
+**Data → Refresh All**. `AgedDebtPQ` follows the new date.
+The AgedDebt sheet remains a Python snapshot, so `AgedDebtCheck`
+will then show differences by design.

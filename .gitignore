@@ -18,3 +18,5 @@ data/
 *.pem
 *.key
 credentials*.json
+# Office lock files while a workbook is open
+~$*

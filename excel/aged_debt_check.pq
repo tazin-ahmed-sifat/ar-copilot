@@ -1,6 +1,7 @@
 // AgedDebtCheck: compares the AgedDebtPQ query with the AgedDebt table exported by
-// Python. It returns only the rows that differ, so an empty result means the two
-// implementations agree. Amounts are compared to the penny.
+// Python, read through the AgedDebtPythonSource query. It returns only the rows that
+// differ, so an empty result means the two implementations agree. Amounts are compared
+// to the penny.
 let
     Columns = {"customer", "document_number", "due_date", "total", "payments", "credits",
                "balance", "days_overdue", "bucket"},
@@ -14,7 +15,7 @@ let
         in
             Rounded,
 
-    FromPython = Normalise(Excel.CurrentWorkbook(){[Name = "AgedDebt"]}[Content]),
+    FromPython = Normalise(AgedDebtPythonSource),
     FromPowerQuery = Normalise(AgedDebtPQ),
 
     Joined = Table.Join(

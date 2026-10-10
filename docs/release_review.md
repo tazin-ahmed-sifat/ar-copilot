@@ -1,77 +1,26 @@
 # Release review
 
-Reviewed on 10 October 2026. This is a single-user prototype using fictional financial data.
+AR Copilot is a single-user prototype with local LLM extraction and optional online Microsoft 365 automation. Ollama qwen3:8b at http://127.0.0.1:11434 is the sole real LLM. Invoice text is never sent to a cloud LLM. Explicit demo fixture replay is a separate plumbing check.
 
-## Supported behavior
+## Supported behavior and saved evidence
 
-The local app extracts text PDFs, requires human review, stores decisions in SQLite and exports
-aged debt to Excel. Approval is a local register action, not an accounting-system posting.
-The repository contains Codex-assisted code, tests and documentation; it does not establish an
-individual contribution percentage.
+The app requires human review, stores decisions and audit history in SQLite, prevents duplicate posting, handles payments and credit notes, ages debt and exports Excel registers. Approval is a local register action, not an accounting-system posting.
 
-A separate manually configured Power Automate flow was tested in the Brunel account: OneDrive
-workbook, Excel rows, overdue positive balances, HTML table and email to the account owner.
-The [implementation guide](microsoft365_onedrive.md) distinguishes that test from proposed
-report-date, duplicate-send, ambiguous-send, replacement-file and pagination safeguards.
-Those cloud safeguards have not been installed or verified in this review. Keep the flow manual;
-no recurring schedule was enabled and no additional email was sent.
-SharePoint and Teams are an unbuilt extension; account creation restrictions remain.
+The saved [Ollama summary](../results/ollama_summary.md) supports 40/40 completed documents, 480/480 correct fields, 40/40 correct documents, 2/2 anomalies detected, zero false positives/runtime failures and 104.99 seconds extraction processing. These synthetic-dataset results do not establish real-invoice accuracy or human time savings. Raw reports stay ignored locally. Existing records, review decisions and historical Git commits are preserved; no history rewrite is part of this change.
 
-## Publication audit before cleanup
+## Separate online automation
 
-The audit scanned 35 commits reachable through refs or reflogs, 190 unique historical blobs and
-both historical compressed Excel blobs, including their decompressed members. It also scanned
-two unreachable blobs found by Git fsck. No configured private-value matches or common
-API-token/private-key patterns were found. The current publication allowlist was scanned too.
-No raw-report, local database or private-data paths were identified in the scanned history.
-The committed workbook fixture and screenshots contain fictional demonstration data.
-Pattern matching cannot prove that every possible credential format or sensitive value is absent.
-Local `.env` contents and discovered values were never displayed.
+The [OneDrive implementation guide](microsoft365_onedrive.md) records the separate manual Power Automate/email test and distinguishes it from proposed report-date, duplicate-send, ambiguous-send, replacement-file and pagination safeguards. Those safeguards require manual account/UI verification. No flow was changed or email sent by this provider cleanup. SharePoint/Teams remain a proposed extension documented [separately](microsoft365.md).
 
-At the initial review, the affected historical path was: `.agents/skills/developing-with-streamlit` was a symlink whose target
-contains a local filesystem path. The current tree no longer tracks it; `.agents/` and `.codex/`
-are ignored. Deleting it in a later commit does not remove historical exposure.
+Internet access is allowed for these intended integrations; the app does not impose a global network-disabling mode. Network isolation has not been verified.
 
-The initial recommendation was to remove that path from every historical ref. A suitable
-remediation is a backed-up, separately reviewed `git filter-repo` operation removing the exact
-path, followed by another audit and coordination with any existing clones. This changes commit
-identifiers and may require remote-history replacement. At that stage no history rewrite, push or deployment
-was performed; the subsequently authorized cleanup is recorded below. If a credential is found in a later audit, revoke it before removing its history.
+## Remaining verification limits
 
-## Authorized history cleanup
+- Streamlit AppTest covers review, payment/export and timing workflows in temporary files. A server health check does not establish native browser upload/download or full visual behavior.
+- OCR is not implemented; scanned invoices require separate handling.
+- Conservative context checks reject oversized invoices without silently truncating them.
+- Real invoices still require human review. Prompt separation and schema checks do not guarantee semantic correctness.
+- Human performance observations are required before any time-savings claim.
+- Microsoft 365 delivery safeguards and schedules require manual verification in the user's account.
 
-After the pre-cleanup findings were explained, the user authorized history removal. A full Git
-metadata backup was created under ignored `runtime/`; keep it private because it retains the
-original history. `git-filter-repo` removed only `.agents/skills/developing-with-streamlit`.
-Remote configuration was restored without displaying it. No push was performed.
-
-The post-rewrite audit scanned 37 commits, 202 unique blobs and two decompressed Excel blobs.
-It found no configured credential matches, common credential patterns, symlinks or private/raw
-report paths. Git fsck found no unreachable objects. All 87 checked current source and local
-evidence files were unchanged. Commit identifiers changed; public or shared remote history,
-if any, still needs a coordinated replacement. Do not merge the old history back into this copy.
-
-## Verification and evidence gaps
-
-- 105 automated tests passed after cleanup, including Streamlit AppTest, timing, evaluation, storage and exports.
-- README local links and image paths were checked; Git whitespace checks passed.
-- Original reports, exported demonstration workbook and demo database were verified against
-  the existing local preservation hashes.
-- Browser discovery returned no available browser. Current visual layout and native browser
-  upload/download behavior remain unverified; screenshots show an earlier offline session.
-- Live extraction completed only 4 of 40 documents. Zero mismatches among those four does not
-  establish real-world accuracy. Neither intentional anomaly nor the credit note was assessed.
-- Human timing measurements have not been supplied. There is no supported time-saving claim.
-- Cloud stale-date and repeat-run tests, persistent duplicate protection, ambiguous-email handling,
-  dynamic file resolution and pagination remain UI verification tasks in the implementation guide.
-
-## Release checklist
-
-- [x] Review wording, safe aggregate evidence, tests and README paths.
-- [x] Preserve local financial records and raw evaluation evidence.
-- [x] Commit safe changes without pushing or deploying.
-- [x] Remove the historical symlink after authorization and audit the rewritten history.
-- [ ] Coordinate remote history replacement if the old commits were already published.
-- [ ] Inspect the current app visually when browser access is available.
-- [ ] Verify cloud safeguards before any schedule; retain manual operation meanwhile.
-- [ ] Collect human measurements before publishing a timing result.
+Only safe aggregate metrics are committed. Do not add raw reports, local credentials, review databases or exported private financial records to Git. No push or external publication is performed by local summary regeneration.

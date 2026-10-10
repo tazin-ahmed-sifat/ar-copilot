@@ -5,32 +5,79 @@
       "label": "Generate fictional data",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "windows": {"command": "${workspaceFolder}/.venv/Scripts/python.exe"},
-      "args": ["-m", "ar_copilot.generate"],
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      },
+      "args": [
+        "-m",
+        "ar_copilot.generate"
+      ],
       "problemMatcher": []
     },
     {
       "label": "Run AR Copilot",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "windows": {"command": "${workspaceFolder}/.venv/Scripts/python.exe"},
-      "args": ["-m", "streamlit", "run", "app.py"],
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      },
+      "args": [
+        "-m",
+        "streamlit",
+        "run",
+        "app.py",
+        "--server.address",
+        "127.0.0.1"
+      ],
       "problemMatcher": []
     },
     {
       "label": "Run tests",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "windows": {"command": "${workspaceFolder}/.venv/Scripts/python.exe"},
-      "args": ["-m", "pytest", "-q"],
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      },
+      "args": [
+        "-m",
+        "pytest",
+        "-q"
+      ],
       "problemMatcher": []
     },
     {
       "label": "Evaluate offline fixtures",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "windows": {"command": "${workspaceFolder}/.venv/Scripts/python.exe"},
-      "args": ["-m", "ar_copilot.evaluate", "--mode", "demo"],
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      },
+      "args": [
+        "-m",
+        "ar_copilot.evaluate",
+        "--mode",
+        "demo"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Evaluate Ollama with checkpoints",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      },
+      "args": [
+        "-m",
+        "ar_copilot.evaluate",
+        "--mode",
+        "ollama",
+        "--resilient",
+        "--pace",
+        "0",
+        "--max-attempts",
+        "1"
+      ],
       "problemMatcher": []
     }
   ]

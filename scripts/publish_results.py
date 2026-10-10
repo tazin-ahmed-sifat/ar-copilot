@@ -37,6 +37,8 @@ def public_summary(report: dict, expected: dict[str, set[str]]) -> dict:
     credits = [r for r in details if r.get('ground_truth', {}).get('document_type') == 'credit_note']
     completed_credits = [r for r in credits if not r['error']]
     return {
+        'provider': report.get('mode', 'gemini'),
+        'model_settings': report.get('model_settings', {}),
         'source_run': report['run_id'],
         'sample': report.get('sample', 'full'),
         'models': sorted({r['model'] for r in details if r.get('model')}),
@@ -142,7 +144,7 @@ def render_markdown(summary: dict) -> str:
     if summary['resume']['stop_reason']:
         rows.append(('Stop reason', summary['resume']['stop_reason']))
     lines = [
-        f"# {OUTPUTS[summary['sample']][1]}",
+        f"# {OUTPUTS[summary['sample']][1].replace('Gemini', summary.get('provider', 'gemini').capitalize())}",
         '',
         f"Run `{summary['source_run']}`, model {', '.join(summary['models'])}, "
         f"{documents} fictional documents, exact string match on {FIELD_COUNT} fields.",
@@ -161,11 +163,11 @@ def main() -> None:
     parser.add_argument('report', type=Path, help='raw full, resilient or per-layout report under reports/gemini/')
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
-    if report.get('mode') != 'gemini' or report.get('sample') not in OUTPUTS:
+    if report.get('mode') not in ('gemini', 'ollama') or report.get('sample') not in OUTPUTS:
         raise SystemExit('Only Gemini runs are published; demo fixture checks are not accuracy.')
     summary = public_summary(report, load_expected(ROOT / 'data'))
     RESULTS.mkdir(exist_ok=True)
-    name = OUTPUTS[summary['sample']][0]
+    name = OUTPUTS[summary['sample']][0].replace('gemini', report['mode'])
     (RESULTS / f'{name}.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
     (RESULTS / f'{name}.md').write_text(render_markdown(summary), encoding='utf-8')
     print(f'Wrote results/{name}.json and results/{name}.md')

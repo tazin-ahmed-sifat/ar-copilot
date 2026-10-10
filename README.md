@@ -1,3 +1,7 @@
+# Local Ollama extraction (default)
+
+AR Copilot now defaults to local-only qwen3:8b inference. See [Ollama setup and measured results](docs/ollama_setup.md) for launch, offline operation and resumable evaluation commands. Existing Gemini results below remain historical Gemini measurements.
+
 # AR Copilot
 
 An accounts-receivable assistant for Northbridge Auto Components Ltd, a fictional automotive

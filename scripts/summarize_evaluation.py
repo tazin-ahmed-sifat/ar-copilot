@@ -84,7 +84,7 @@ def main() -> None:
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     report = json.loads(args.report.read_text())
-    if report['mode'] != 'gemini':
+    if report['mode'] not in ('gemini', 'ollama'):
         raise SystemExit('This summary is for Gemini reports only; demo stays separate.')
     result = summarize(report, json.loads((root/'data/anomalies.json').read_text()))
     destination = args.report.with_name(args.report.stem + '_summary.json')

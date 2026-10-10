@@ -99,7 +99,7 @@ def metrics(details: list[dict], expected: dict[str, set[str]]) -> dict:
 
 def run_evaluation(output, folder=ROOT/'data', resume=None, policy=None, limit=None,
                    call=extract, sleep=time.sleep, monotonic=time.perf_counter, uniform=random.uniform,
-                   announce=print, database=None) -> dict:
+                   announce=print, database=None, mode='gemini') -> dict:
     """Evaluate every failed or pending document, checkpointing to `output` after each step.
 
     With `resume`, successful extractions from that report are reused and only its failed
@@ -111,6 +111,15 @@ def run_evaluation(output, folder=ROOT/'data', resume=None, policy=None, limit=N
     rows = list(csv.DictReader((folder/'ground_truth.csv').open(encoding='utf-8')))
     expected = load_expected(folder)
     source = _load_source(resume, rows)
+    if source and source['mode'] != mode:
+        raise ValueError('Resume provider differs')
+    if mode == 'ollama':
+        from .config import ollama_settings
+        from .ollama import OPTIONS
+        if source and source.get('model_settings') != dict(OPTIONS, think=False, timeout_seconds=120):
+            raise ValueError('Resume model settings differ')
+        if source and any(r.get('model') not in (None, ollama_settings()[1]) for r in source['details']):
+            raise ValueError('Resume model differs')
     prior_by_name = {r['filename']: r for r in source['details']} if source else {}
     payloads = {r['filename']: (folder/'invoices'/r['filename']).read_bytes() for r in rows}
     details = [_starting_detail(row, payloads[row['filename']], prior_by_name.get(row['filename']))
@@ -120,6 +129,12 @@ def run_evaluation(output, folder=ROOT/'data', resume=None, policy=None, limit=N
                resume_source=str(resume) if resume else None, prior_seconds=prior_seconds,
                call=call, sleep=sleep, monotonic=monotonic, uniform=uniform, announce=announce,
                database=Path(database) if database else ROOT/'runtime/ar.sqlite')
+    run.mode = mode
+    run.report['mode'] = mode
+    run.report['provider'] = mode
+    if mode == 'ollama':
+        from .ollama import OPTIONS
+        run.report['model_settings'] = dict(OPTIONS, think=False, timeout_seconds=120)
     return run.execute(rows, payloads, limit)
 
 
@@ -136,7 +151,7 @@ def _load_source(resume, rows: list[dict]) -> dict | None:
     if not resume:
         return None
     source = json.loads(Path(resume).read_text())
-    if source['mode'] != 'gemini' or len(source['details']) != len(rows):
+    if source['mode'] not in ('gemini', 'ollama') or len(source['details']) != len(rows):
         raise ValueError('Resume requires a full Gemini report for this corpus')
     if {r['filename'] for r in source['details']} != {r['filename'] for r in rows}:
         raise ValueError('Resume source document set differs from dataset')
@@ -210,7 +225,7 @@ class _Run:
                 self.sleep(delay)
                 self.report['new_pacing_wait_seconds'] += delay
         self.last_request_start = self.monotonic()
-        return self.call(raw, 'gemini', self.folder/'demo_fixtures.json', single_attempt=True)
+        return self.call(raw, self.mode, self.folder/'demo_fixtures.json', single_attempt=True)
 
     def record_attempt(self, attempt: dict) -> None:
         # An attempt is reported again once its retry wait is known; replace it rather than append.

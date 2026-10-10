@@ -10,13 +10,13 @@ import json
 import os
 from pathlib import Path
 
-from .config import ROOT, configuration_status, gemini_settings
+from .config import ROOT, configuration_status, gemini_settings, local_only
 from .core import FIELDS, validate
 from .extract import extract
 from .resilient import load_expected, run_stamp, score_fields
 
 
-def evaluate(folder=ROOT/'data', mode: str = 'demo', sample: str = 'full') -> dict:
+def evaluate(folder=ROOT/'data', mode: str = 'ollama', sample: str = 'full') -> dict:
     """Extract every sampled document once and score fields, documents and anomaly routing."""
     folder = Path(folder)
     truth = list(csv.DictReader((folder/'ground_truth.csv').open(encoding='utf-8')))
@@ -55,15 +55,18 @@ def _report(details: list[dict], mode: str, sample: str, expected: dict[str, set
     )
     seconds = [r['seconds'] for r in details]
     return dict(
-        mode=mode, sample=sample, measured_gemini_accuracy=mode == 'gemini' and successes > 0,
-        label='OFFLINE FIXTURE CHECK - NOT GEMINI ACCURACY' if mode == 'demo' else 'Gemini raw extraction evaluation',
+        mode=mode, provider=mode, sample=sample,
+        model_settings=details[0].get('model_settings', {}), measured_gemini_accuracy=mode == 'gemini' and successes > 0,
+        label='OFFLINE FIXTURE CHECK - NOT GEMINI ACCURACY' if mode == 'demo' else mode + ' raw extraction evaluation',
         documents=n, successful_extractions=successes, extraction_errors=n - successes,
         fields=FIELDS, field_accuracy={f: correct[f] / n for f in FIELDS},
         overall_field_accuracy=sum(correct.values()) / (n * len(FIELDS)),
         document_accuracy=exact / n, validation=validation,
         seconds_total=sum(seconds), seconds_mean=sum(seconds) / n,
         # A clean three-layout smoke test is the gate before spending quota on all 40.
-        full_evaluation_ready=(mode == 'gemini' and sample == 'per-layout' and exact == n
+        completed_document_accuracy=exact / successes if successes else None,
+        completion_rate=successes/n,
+        full_evaluation_ready=(mode in ('gemini', 'ollama') and sample == 'per-layout' and exact == n
                                and not any(r['validation'] for r in details)),
         details=details,
     )
@@ -77,7 +80,7 @@ def database_fingerprint() -> str | None:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Evaluate extraction against the fictional ground truth.')
-    parser.add_argument('--mode', choices=['demo', 'gemini'], default='demo')
+    parser.add_argument('--mode', choices=['ollama', 'demo', 'gemini'], default='ollama')
     parser.add_argument('--sample', choices=['full', 'per-layout'], default='full')
     parser.add_argument('--check-config', action='store_true', help='show whether a key is set, never the key')
     parser.add_argument('--list-models', action='store_true', help='list models this key can call')
@@ -94,6 +97,9 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _list_models() -> int:
+    if local_only():
+        print('Cloud model discovery is disabled in local-only mode.')
+        return 2
     from google import genai
 
     key, _ = gemini_settings()
@@ -115,9 +121,9 @@ def _run_resilient(args) -> int:
     from .resilient import run_evaluation
     from .retry import RetryPolicy
 
-    destination = ROOT/'reports/gemini'/f'resilient_{run_stamp()}.json'
+    destination = ROOT/'reports'/args.mode/f'resilient_{run_stamp()}.json'
     policy = RetryPolicy(args.max_attempts, args.base_delay, args.max_delay, args.max_wait, args.pace)
-    report = run_evaluation(destination, resume=args.resume, policy=policy, limit=args.limit)
+    report = run_evaluation(destination, resume=args.resume, policy=policy, limit=args.limit, mode=args.mode)
     print(json.dumps({k: v for k, v in report.items() if k not in ('details', 'active_attempts')}, indent=2))
     print(f'Checkpoint: {destination}')
     return 0
@@ -138,7 +144,7 @@ def _run_single(args) -> int:
     if report['full_evaluation_ready']:
         tested_model = report['details'][0]['model']
         print('Three-layout smoke test passed. Full run: '
-              f'python -m ar_copilot.evaluate --mode gemini --sample full --model {tested_model}')
+              f'python -m ar_copilot.evaluate --mode {args.mode} --sample full --model {tested_model}')
     return 0
 
 
@@ -149,14 +155,14 @@ def main() -> int:
         print(json.dumps(configuration_status(), indent=2))
         return 0
     if args.model:
-        os.environ['GEMINI_MODEL'] = args.model
+        os.environ['OLLAMA_MODEL' if args.mode == 'ollama' else 'GEMINI_MODEL'] = args.model
     if args.list_models:
         return _list_models()
     if args.mode == 'gemini' and not configuration_status()['key_configured']:
         print('Gemini key not configured. Save it locally in .env; no API calls or measured results produced.')
         return 2
     if args.resilient or args.resume:
-        if args.mode != 'gemini' or args.sample != 'full':
+        if args.mode not in ('gemini', 'ollama') or args.sample != 'full':
             parser.error('Resilient/resume runs require --mode gemini --sample full')
         return _run_resilient(args)
     return _run_single(args)

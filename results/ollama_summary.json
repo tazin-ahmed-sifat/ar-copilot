@@ -1,0 +1,102 @@
+{
+  "provider": "ollama",
+  "model_settings": {
+    "num_ctx": 4096,
+    "num_predict": 768,
+    "temperature": 0,
+    "seed": 42,
+    "think": false,
+    "timeout_seconds": 120
+  },
+  "source_run": "20261010T222850367164Z",
+  "sample": "full",
+  "models": [
+    "qwen3:8b"
+  ],
+  "documents": 40,
+  "completion": {
+    "completed": 40,
+    "failed": 0,
+    "pending": 0,
+    "rate": 1.0,
+    "failures_by_http_status": {},
+    "failures_by_kind": {}
+  },
+  "extraction_mistakes": {
+    "completed_documents_with_mismatches": 0,
+    "incorrect_fields_on_completed": 0
+  },
+  "credit_notes": {
+    "documents": 1,
+    "completed": 1,
+    "exact_documents": 1,
+    "unassessed": 0
+  },
+  "processing_seconds": {
+    "new_request_seconds": 104.98665420001271,
+    "new_retry_wait_seconds": 0.0,
+    "new_pacing_wait_seconds": 0.0,
+    "invocation_seconds": 105.68481140000222,
+    "cumulative_observed_seconds": 104.98665420001271
+  },
+  "resume": {
+    "state": "finished",
+    "stop_reason": null,
+    "attempted_this_run": 40,
+    "successful_calls_reused": 0
+  },
+  "counts": {
+    "correct_fields": 480,
+    "exact_documents": 40
+  },
+  "accuracy_on_completed": {
+    "field": 1.0,
+    "document": 1.0,
+    "per_field": {
+      "document_type": 1.0,
+      "supplier": 1.0,
+      "customer": 1.0,
+      "document_number": 1.0,
+      "invoice_date": 1.0,
+      "due_date": 1.0,
+      "po_number": 1.0,
+      "currency": 1.0,
+      "net": 1.0,
+      "vat": 1.0,
+      "total": 1.0,
+      "linked_invoice": 1.0
+    }
+  },
+  "accuracy_overall": {
+    "field": 1.0,
+    "document": 1.0,
+    "per_field": {
+      "document_type": 1.0,
+      "supplier": 1.0,
+      "customer": 1.0,
+      "document_number": 1.0,
+      "invoice_date": 1.0,
+      "due_date": 1.0,
+      "po_number": 1.0,
+      "currency": 1.0,
+      "net": 1.0,
+      "vat": 1.0,
+      "total": 1.0,
+      "linked_invoice": 1.0
+    }
+  },
+  "accounting_anomalies": {
+    "expected": 2,
+    "rules_detected": 2,
+    "rules_missed_after_completed_extraction": 0,
+    "unassessed": 0,
+    "false_positives": 0
+  },
+  "latency_seconds_completed": {
+    "n": 40,
+    "median": 2.122480200001519,
+    "min": 1.9445160000032047,
+    "max": 4.131463300000178
+  },
+  "review_database_unchanged": true
+}

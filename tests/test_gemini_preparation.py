@@ -75,3 +75,14 @@ def test_provider_error_does_not_expose_exception_message(tmp_path, monkeypatch)
     monkeypatch.setattr(genai,'Client',FakeClient)
     result=extract((folder/'invoices/NC-0001.pdf').read_bytes(),'gemini')
     assert result['error'] and 'FAKE_VALUE' not in json.dumps(result)
+
+def test_failed_gemini_call_still_records_the_model(tmp_path, monkeypatch):
+    from google import genai
+    folder = tmp_path/'data'; generate(folder)
+    monkeypatch.setattr('ar_copilot.extract.gemini_settings', lambda: ('FAKE_VALUE', 'test-model'))
+    class FailingClient:
+        def __init__(self, **kwargs):
+            raise RuntimeError('mock outage')
+    monkeypatch.setattr(genai, 'Client', FailingClient)
+    result = extract((folder/'invoices/NC-0001.pdf').read_bytes(), 'gemini')
+    assert result['error'] and result['model'] == 'test-model'

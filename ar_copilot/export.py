@@ -53,6 +53,8 @@ class _Formats:
         self.total_label = book.add_format({'bold': True, 'top': 1, 'top_color': INK})
         self.total_money = book.add_format({'bold': True, 'num_format': GBP, 'top': 1, 'top_color': INK})
         self.row_total = book.add_format({'bold': True, 'num_format': GBP})
+        # Explicit, because Summary column B carries the money format and would otherwise apply.
+        self.count = book.add_format({'num_format': '0', 'align': 'left'})
         self.date_value = book.add_format({'num_format': 'dd mmm yyyy', 'align': 'left', 'bold': True})
 
 
@@ -177,7 +179,7 @@ def _write_summary(book, sheet, formats: _Formats, debt: list[dict], reporting_d
 
     sheet.write(total_row + 2, 0, 'Documents excluded (in review or rejected)', formats.label)
     sheet.write_formula(total_row + 2, 1, f'=COUNTA(Unresolved!$B$2:$B${max(unresolved_count, 1) + 1})',
-                        None, unresolved_count)
+                        formats.count, unresolved_count)
     _insert_bucket_chart(book, sheet, header_row, total_row - 1, total_row + 4)
 
 

@@ -165,3 +165,20 @@ def test_summary_sheet_totals_are_traceable_formulas(corpus):
 def test_bucket_boundaries(days, bucket):
     from ar_copilot.core import bucket_for
     assert bucket_for(days) == bucket
+
+def test_summary_excluded_count_is_not_formatted_as_money(corpus):
+    import re
+    from xml.etree import ElementTree as ET
+    from tests.helpers import NS
+    records = [dict(r, status='approved', posting_key=r['document_number'], hash=r['document_number'], id=i,
+                    filename=r['filename']) for i, r in enumerate(corpus[1]) if not validate(r)]
+    records.append(dict(corpus[1][8], status='review', id=99, filename='NC-0009.pdf', posting_key=None, hash='x'))
+    debt = aged_debt(records, [], date(2026, 10, 10))
+    with zipfile.ZipFile(io.BytesIO(workbook(records, debt, date(2026, 10, 10)))) as archive:
+        summary = ET.fromstring(sheet_xml(archive, 'Summary'))
+        styles = ET.fromstring(archive.read('xl/styles.xml'))
+    count_cell = next(c for c in summary.iter(f"{{{NS['m']}}}c")
+                      if (c.find('m:f', NS) is not None and c.find('m:f', NS).text.startswith('COUNTA')))
+    xf = styles.find('m:cellXfs', NS)[int(count_cell.get('s', 0))]
+    codes = {f.get('numFmtId'): f.get('formatCode') for f in styles.iter(f"{{{NS['m']}}}numFmt")}
+    assert '£' not in (codes.get(xf.get('numFmtId')) or '')

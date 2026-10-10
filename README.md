@@ -132,6 +132,6 @@ To re-run the paced evaluation and refresh `results/`, see [retry and resume](do
 ## More
 
 - [Microsoft 365 build guide](docs/microsoft365.md): SharePoint list, flows and a Teams post. Not yet built.
-- [OneDrive, Excel and email demonstration](docs/microsoft365_onedrive.md): the reduced flow built in a university account.
+- [OneDrive, Excel and email demonstration](docs/microsoft365_onedrive.md): the reduced flow built and tested by hand in a university account.
 - [Retry and resume](docs/retry_resume.md), [Gemini setup](docs/gemini_live_testing.md), [local QA](docs/local_testing.md),
   [what is and isn't in the repository](docs/public_repository.md).

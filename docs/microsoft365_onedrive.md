@@ -4,31 +4,65 @@ This is what is built in a Brunel University account, which blocks creating Shar
 and Teams teams. It replaces those with OneDrive for Business and an email to the builder's own
 address. The SharePoint list and Teams post in [the design guide](microsoft365.md) remain unbuilt.
 
-**Status: steps 1–4 built and run manually; the email step is not yet built.** No recurring
-schedule is enabled, and the flow contacts no one but its owner.
+**Status: built and tested by hand on 10 October 2026.** The flow runs only when triggered
+manually; no recurring schedule is enabled, and it emails no one but its owner.
 
 ## Flow: AR Copilot — Read aged debt
 
-Instant cloud flow, run by hand. Connections: Excel Online (Business) and, for step 5,
-Office 365 Outlook.
+Instant cloud flow in the default Brunel environment, not shared with anyone. Connections, both
+signed in as the flow owner: Excel Online (Business) and Office 365 Outlook.
 
-| Step | Action | Settings | Status |
-| --- | --- | --- | --- |
-| 1 | Manually trigger a flow | none | Built |
-| 2 | Excel Online (Business): List rows present in a table | Location: OneDrive for Business. File: `/AR Copilot/aged-debt/ar_debt_2026-10-10.xlsx`. Table: `AgedDebt`. DateTime Format: ISO 8601 | Built |
-| 3 | Filter array | Keeps rows with a positive balance whose bucket is not `current`, and drops the blank template row | Built |
-| 4 | Create HTML table | Columns: Customer, Invoice, Due date, Balance (£), Days overdue, Bucket | Built |
-| 5 | Office 365 Outlook: Send an email (V2) | To the owner's own Brunel address only; see below | Not built |
+| Step | Action | Settings as built |
+| --- | --- | --- |
+| 1 | Manually trigger a flow | none |
+| 2 | Excel Online (Business): List rows present in a table | Location: OneDrive for Business (`me`). File: `/AR Copilot/aged-debt/ar_debt_2026-10-10.xlsx`. Table: `AgedDebt`. DateTime Format: ISO 8601. Pagination off |
+| 3 | Filter array | From `outputs('List_rows_present_in_a_table')?['body/value']`, where expression below |
+| 4 | Create HTML table | From `body('Filter_array')`; columns below |
+| 5 | Office 365 Outlook: Send an email (V2) | To: the flow owner's own Brunel address, typed and resolved to their directory entry. No CC, BCC or Reply To. Importance: Normal |
 
-For step 3, the design guide's equivalent expression is
-`@and(greater(float(item()?['balance']), 0), not(equals(item()?['bucket'], 'current')))`.
-A blank row has no balance, so add `not(empty(item()?['document_number']))` if the flow's
-filter handles blank rows that way.
+Step 3's condition keeps rows that have a document number (dropping the blank template row), a
+positive balance, and a bucket other than `current`:
 
-### Observed run
+```
+@and(not(empty(item()?['document_number'])),
+     greater(float(if(empty(item()?['balance']), '0', item()?['balance'])), 0),
+     not(equals(item()?['bucket'], 'current')))
+```
 
-A manual run against the workbook exported for 10 October 2026 produced one overdue row:
-NC-0003, Cedar Automotive Ltd, due 11/05/2026, balance £5,218.20, 152 days overdue, bucket 91+.
+Step 4's columns:
+
+| Header | Value |
+| --- | --- |
+| Customer | `item()?['customer']` |
+| Invoice | `item()?['document_number']` |
+| Due date | `formatDateTime(item()?['due_date'], 'dd/MM/yyyy')` |
+| Balance (£) | `formatNumber(float(item()?['balance']), 'N2', 'en-GB')` |
+| Days overdue | `item()?['days_overdue']` |
+| Bucket | `item()?['bucket']` |
+
+Step 5's subject is `AR Copilot: overdue receivables at 2026-10-10`. Its body is one line of
+text, "Overdue receivables at 10 October 2026. Fictional demo data from AR Copilot.", followed by
+the Create HTML table output, inserted from the dynamic content list.
+
+Pagination is off, which caps step 2 at 256 rows. That is enough for the demo's 37 aged-debt rows;
+switch it on (threshold 5000) before using a larger workbook.
+
+## Test run, 10 October 2026
+
+| Check | Result |
+| --- | --- |
+| Recipient before running | Code view showed a single To address, the owner's own; no CC or BCC fields |
+| Run | One manual run at 20:35 GMT. All five steps succeeded; Send an email returned HTTP 200 |
+| Email sent | Run history shows one message to the owner's address, with the subject above |
+| Rendering in Outlook | Checked by the owner: intro line, bold column headings, and one row reading Cedar Automotive Ltd, NC-0003, 11/05/2026, 5,218.20, 152, 91+ |
+| Schedule | None. The trigger is still manual |
+
+Create HTML table produces a table with no borders or cell padding, so the columns sit close
+together. It is readable as it stands. To space it out, a Compose step can wrap the output in
+styled HTML, for example replacing `<table>` with `<table style="border-collapse:collapse">`
+and adding `style="padding:4px 12px"` to `<td>` and `<th>`. That change hasn't been made or tested.
+
+### Why the only row is NC-0003 at full value
 
 The balance equals the invoice total, so no payment was applied. The demo ledger
 (`data/payments.csv`) pays NC-0003 in full on 16 May 2026 (PAY-0003), which means this workbook
@@ -36,44 +70,11 @@ was exported before the ledger was imported. The flow read the table correctly. 
 reflects payments, import the ledger in the app, export again, replace the file in OneDrive, and
 rerun: NC-0003 then has a zero balance and drops out of the overdue list.
 
-## Step 5: email to yourself (to build)
-
-1. Add **Send an email (V2)** after Create HTML table.
-2. **To**: type your own Brunel address. Do not use a dynamic value, a group or a distribution
-   list. Check the address character by character before saving.
-3. **Subject**: `AR Copilot: overdue receivables at 2026-10-10`.
-4. **Body** (switch the editor to code view `</>`):
-   ```
-   <p><b>Overdue receivables at 2026-10-10</b></p>
-   <p>@{length(body('Filter_array'))} overdue invoices. Fictional demo data.</p>
-   @{body('Create_HTML_table')}
-   ```
-5. **Importance**: Normal. Leave CC, BCC and Reply To empty.
-6. Save, then **Test → Manually → Run flow** once.
-
-## Test checklist
-
-- [ ] Before running, the To field holds only your own Brunel address and CC/BCC are empty.
-- [ ] The run succeeds and sends exactly one email.
-- [ ] In Outlook on the web, the email arrives in your own inbox with the subject above.
-- [ ] The table renders with column headings and the same rows as the flow's Create HTML table
-      output (with the current workbook: NC-0003, Cedar Automotive Ltd, £5,218.20, 152 days, 91+).
-- [ ] Amounts show a £ sign and two decimals, and the due date reads as 11 May 2026.
-- [ ] The flow has no recurrence trigger; it stays manual.
-
-When the checklist passes, record the run date and change step 5's status to Built.
-
-| Item | Value |
-| --- | --- |
-| Flow | AR Copilot — Read aged debt |
-| Source workbook | OneDrive: AR Copilot/aged-debt/ar_debt_2026-10-10.xlsx |
-| Email recipient | owner only |
-| Email test run | not yet |
-
 ## Differences from the full design
 
-- The workbook path is fixed rather than found as the latest file, so there is no staleness check
-  yet. Add one before any schedule, as in step 4 of the design guide's overdue flow.
-- There is no run key, so running it twice sends two emails. That is acceptable for a manual demo,
-  not for a scheduled flow.
-- An email to yourself replaces the Teams channel post.
+- The workbook path is fixed rather than found as the latest file, so there is no staleness check.
+  Add one before any schedule, as in step 4 of the design guide's overdue flow.
+- There is no run key, so each run sends another email. That is fine for a manual demo, not for
+  a scheduled flow.
+- An email to the owner replaces the Teams channel post, and the SharePoint list import is not
+  part of this flow.

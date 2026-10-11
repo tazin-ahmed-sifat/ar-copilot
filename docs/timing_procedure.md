@@ -2,8 +2,8 @@
 
 The extraction evaluation measures how long the model takes, not how long a person takes. This
 study measures the person: the time to enter a document by hand, compared with the time to
-check and correct the model's draft of a similar document. **No timings have been collected
-yet**, so the project currently makes no time-saving claim.
+check and correct the model's draft of a similar document. A one-person pilot was run on
+11 October 2026. Its results and caveats are in the [README](../README.md#timing-pilot).
 
 ## Design
 

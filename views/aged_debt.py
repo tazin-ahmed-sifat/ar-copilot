@@ -106,7 +106,7 @@ st.caption(f'Workbooks are snapshots as at {reporting_date:%d %B %Y}.')
 left, right = st.columns(2)
 left.download_button('Aged debt workbook', lambda: workbook(records, debt, reporting_date, 'debt', payments),
                      f'ar_debt_{reporting_date.isoformat()}.xlsx', XLSX, width='stretch')
-right.download_button('Posted register for Power Automate',
+right.download_button('Posted receivables register',
                       lambda: workbook(records, debt, reporting_date, 'posted', payments),
                       f'ar_posted_{reporting_date.isoformat()}.xlsx', XLSX, width='stretch')
 with st.expander(f'Payment ledger ({len(payments)})'):

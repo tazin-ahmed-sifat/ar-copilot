@@ -89,7 +89,7 @@ def test_complete_demo_import_review_export(isolated_app, monkeypatch):
 
     app.switch_page('views/aged_debt.py').run()
     assert not app.exception
-    for label in ('Posted register for Power Automate', 'Aged debt workbook'):
+    for label in ('Posted receivables register', 'Aged debt workbook'):
         with zipfile.ZipFile(io.BytesIO(captured[label])) as book:
             assert book.testzip() is None
             table = ET.fromstring(book.read('xl/tables/table1.xml'))

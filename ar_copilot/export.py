@@ -1,4 +1,4 @@
-"""Excel exports: an aged-debt workbook for people and a flat document register for flows.
+"""Excel exports: an aged-debt workbook for people and a flat register of posted documents.
 
 Table values are Decimal snapshots computed in Python. The Summary sheet adds SUMIF
 formulas over the AgedDebt table so every total can be traced back to its rows, and

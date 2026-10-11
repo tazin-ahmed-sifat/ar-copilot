@@ -163,4 +163,4 @@ else:
                    'Incomplete': g['incomplete'], 'Unresolved': g['unresolved'],
                    'Median completed s': g['seconds']['median'], 'Field errors': g['field_errors_total'],
                    'API failures': g['api_failures']} for key, g in summary['groups'].items()], hide_index=True)
-    st.caption('After collecting, ask for validation before publishing. Raw observations remain local.')
+    st.caption('When the plan is finished, run scripts/summarize_timings.py. Raw attempts stay in runtime/timings.csv.')

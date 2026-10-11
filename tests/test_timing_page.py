@@ -122,3 +122,39 @@ def test_local_failure_remains_reviewable_without_provider_controls(tmp_path, mo
     assert load_timings()[0].api_failed and load_timings()[0].failure_reason == 'runtime_unavailable'
     button(app, 'Record incomplete attempt').click().run()
     assert not app.exception and load_timings()[0].status == 'incomplete'
+
+
+def test_measured_plan_through_the_page_yields_a_matched_comparison(tmp_path, monkeypatch):
+    """Software-only: a fake clock and mocked extraction stand in for a person and the model."""
+    app = page(tmp_path, monkeypatch)
+    folder = tmp_path / 'runtime' / 'timing_data'
+    with (folder / 'ground_truth.csv').open(encoding='utf-8') as handle:
+        truth = {row['filename']: row for row in csv.DictReader(handle)}
+    clock = [0.0]
+    monkeypatch.setattr(time, 'perf_counter', lambda: clock[0])
+    def fake_extract(pdf, mode, *args, **kwargs):
+        assert mode == 'ollama'
+        clock[0] += 4.0
+        filename = app.session_state['timing']['attempt'].filename
+        return dict(fields={f: truth[filename][f] or None for f in FIELDS}, seconds=4.0, error=None, model='qwen3:8b')
+    monkeypatch.setattr('ar_copilot.extract.extract', fake_extract)
+    next(w for w in app.checkbox if w.label == 'Practice run (excluded from results)').uncheck().run()
+    next(w for w in app.checkbox if w.label.startswith('I had not read')).check().run()
+    for _ in range(12):
+        button(app, 'Start next document').click().run()
+        assert not app.exception
+        attempt = app.session_state['timing']['attempt']
+        if attempt.method == 'manual':
+            for field in FIELDS:
+                next(w for w in app.text_input if w.label == FIELD_LABELS[field]).set_value(truth[attempt.filename][field])
+        clock[0] += 80.0 if attempt.method == 'manual' else 36.0
+        button(app, 'Finish document').click().run()
+        assert not app.exception
+    rows = load_timings()
+    assert len(rows) == 12 and all(r.status == 'completed' and r.field_errors == 0 for r in rows)
+    assert {r.extraction_seconds for r in rows if r.method == 'assisted'} == {4.0}
+    result = summarise(rows)['comparison']
+    assert result['available'] and result['completed_pairs'] == 6
+    assert result['manual_seconds']['median'] == 80 and result['assisted_seconds']['median'] == 40
+    assert result['percentage_time_reduction'] == 50
+    assert button(app, 'Start next document').disabled

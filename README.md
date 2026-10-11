@@ -215,6 +215,13 @@ The 40 demo PDFs and the payment ledger are generated into `data/`, which is not
 .\.venv\Scripts\python.exe -m ar_copilot.generate
 ```
 
+The **Time a document** page also needs its own separate document set (this script won't
+overwrite an existing one):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\prepare_timing_documents.py
+```
+
 Start the app with Ollama running:
 
 ```powershell

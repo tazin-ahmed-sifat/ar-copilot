@@ -6,9 +6,12 @@ aged-debt workbook contains: the `PostedReceivables` and `Payments` tables and t
 `ar_copilot.core.aged_debt`, so a finance user can recalculate the buckets for a new
 date without Python.
 
-Status: verified in Excel against the fixture on 10 October 2026.
-AgedDebtCheck returned zero differences. AgedDebtPQ contained nine rows,
-excluded FX-09, and showed FX-08 with a balance of -£40.00.
+This was checked by hand in Excel desktop against the fixture on 10 October 2026.
+AgedDebtCheck returned zero differences, and AgedDebtPQ had nine rows, left out FX-09, and
+showed FX-08 with a balance of -£40.00.
+
+`validate_aged_debt.ts` in this folder is an Office Script that isn't used yet; see
+[docs/microsoft365.md](../docs/microsoft365.md).
 
 ## Fixture
 

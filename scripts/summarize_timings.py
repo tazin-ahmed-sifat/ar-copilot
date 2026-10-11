@@ -59,7 +59,8 @@ def _comparison(summary):
             f"range {_seconds(manual['min'])} to {_seconds(manual['max'])} s; "
             f"matched assisted Q1-Q3 {_seconds(assisted['q1'])} to {_seconds(assisted['q3'])} s, "
             f"range {_seconds(assisted['min'])} to {_seconds(assisted['max'])} s. "
-            f"Median difference, manual minus assisted (Ollama): {result['median_difference_seconds']:.1f} s. "
+            f"Difference between the two medians (manual minus assisted): {result['difference_of_medians_seconds']:.1f} s. "
+            f"Median of the per-pair differences: {result['median_paired_difference_seconds']:.1f} s. "
             f"Percentage time reduction: {result['percentage_time_reduction']:.1f}%. "
             f"Definition: {result['definition']} {result['limitation']}")
 

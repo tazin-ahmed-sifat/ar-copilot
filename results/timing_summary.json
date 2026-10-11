@@ -1,0 +1,95 @@
+{
+  "practice_rows_excluded": 1,
+  "groups": {
+    "assisted/ollama": {
+      "documents": 6,
+      "completed": 6,
+      "incomplete": 0,
+      "unresolved": 0,
+      "api_failures": 0,
+      "unknown_extraction_outcomes": 0,
+      "operators": 1,
+      "seconds": {
+        "median": 6.9858841500001745,
+        "q1": 5.3230433749999975,
+        "q3": 8.299148049999985,
+        "min": 3.735851299999922,
+        "max": 13.431553100000201
+      },
+      "incomplete_seconds": {
+        "median": null,
+        "q1": null,
+        "q3": null,
+        "min": null,
+        "max": null
+      },
+      "unknown_durations": 0,
+      "extraction_seconds_median": 2.207205250000243,
+      "field_errors_total": 0,
+      "field_error_rate": 0.0,
+      "documents_with_errors": 0,
+      "fields_corrected_total": 0,
+      "corrections_unassessed_api_failures": 0,
+      "decision_errors": 0,
+      "decisions_unscored": 0
+    },
+    "manual/none": {
+      "documents": 6,
+      "completed": 6,
+      "incomplete": 0,
+      "unresolved": 0,
+      "api_failures": 0,
+      "unknown_extraction_outcomes": 0,
+      "operators": 1,
+      "seconds": {
+        "median": 85.04401704999987,
+        "q1": 76.35205957499977,
+        "q3": 90.5861105749999,
+        "min": 61.23305110000001,
+        "max": 91.0357398000001
+      },
+      "incomplete_seconds": {
+        "median": null,
+        "q1": null,
+        "q3": null,
+        "min": null,
+        "max": null
+      },
+      "unknown_durations": 0,
+      "extraction_seconds_median": 0.0,
+      "field_errors_total": 6,
+      "field_error_rate": 0.08333333333333333,
+      "documents_with_errors": 3,
+      "fields_corrected_total": 0,
+      "corrections_unassessed_api_failures": 0,
+      "decision_errors": 0,
+      "decisions_unscored": 0
+    }
+  },
+  "comparison": {
+    "available": true,
+    "protocol": "counterbalanced-v1",
+    "participants": 1,
+    "completed_pairs": 6,
+    "incomplete_pairs_excluded": 0,
+    "manual_seconds": {
+      "median": 85.04401704999987,
+      "q1": 76.35205957499977,
+      "q3": 90.5861105749999,
+      "min": 61.23305110000001,
+      "max": 91.0357398000001
+    },
+    "assisted_seconds": {
+      "median": 6.9858841500001745,
+      "q1": 5.3230433749999975,
+      "q3": 8.299148049999985,
+      "min": 3.735851299999922,
+      "max": 13.431553100000201
+    },
+    "difference_of_medians_seconds": 78.05813289999969,
+    "median_paired_difference_seconds": 74.51620794999985,
+    "percentage_time_reduction": 91.7855665897191,
+    "definition": "100 * (manual median - Ollama-assisted median) / manual median on matched completed pairs; negative means slower.",
+    "limitation": "Different invoices matched by layout; synthetic pilot, no causal claim. Incomplete pairs excluded from medians but retained in attempt counts; completion bias remains."
+  }
+}

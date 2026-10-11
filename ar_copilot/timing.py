@@ -228,10 +228,15 @@ def comparison(timings):
     manual = [r.seconds for pair in paired for r in pair if r.method == 'manual']
     assisted = [r.seconds for pair in paired for r in pair if r.method == 'assisted']
     m, a = statistics.median(manual), statistics.median(assisted)
+    # Same participant and pair, so the per-pair difference is the paired measure.
+    paired_differences = [next(r.seconds for r in pair if r.method == 'manual')
+                          - next(r.seconds for r in pair if r.method == 'assisted') for pair in paired]
     return dict(available=True, protocol=PROTOCOL, participants=len({r.operator for r in measured}),
                 completed_pairs=len(paired), incomplete_pairs_excluded=excluded,
                 manual_seconds=_spread(manual), assisted_seconds=_spread(assisted),
-                median_difference_seconds=m-a, percentage_time_reduction=100*(m-a)/m,
+                difference_of_medians_seconds=m-a,
+                median_paired_difference_seconds=statistics.median(paired_differences),
+                percentage_time_reduction=100*(m-a)/m,
                 definition='100 * (manual median - Ollama-assisted median) / manual median on matched completed pairs; negative means slower.',
                 limitation='Different invoices matched by layout; synthetic pilot, no causal claim. Incomplete pairs excluded from medians but retained in attempt counts; completion bias remains.')
 

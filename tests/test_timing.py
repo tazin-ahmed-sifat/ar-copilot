@@ -71,7 +71,8 @@ def test_matched_comparison_formula_and_publication_privacy():
     result = summary['comparison']
     assert result['completed_pairs'] == 6 and result['percentage_time_reduction'] == 60
     text = render_markdown(summary)
-    assert 'manual minus assisted (Ollama): 30.0 s' in text
+    assert 'Difference between the two medians (manual minus assisted): 30.0 s' in text
+    assert 'Median of the per-pair differences: 30.0 s' in text
     assert 'Percentage time reduction: 60.0%' in text
     assert all(private not in json.dumps(summary) + text for private in ('tester', 'NC-', 'TEST-ONLY', 'test-1'))
 
@@ -197,3 +198,14 @@ def test_historical_timing_rows_remain_readable_but_cannot_be_new_attempts(tmp_p
     assert not summarise(loaded)['comparison']['available']
     with pytest.raises(ValueError,match='method/extraction mode'):
         append_timing(row,path)
+
+
+def test_paired_median_is_reported_separately_from_difference_of_medians():
+    """Medians of each method need not differ by the median of the per-pair differences."""
+    from dataclasses import replace
+    times = {'1': (90, 10), '2': (60, 8), '3': (80, 4), '4': (91, 5), '5': (75, 6), '6': (85, 13)}
+    rows = [replace(r, seconds=times[r.pair_id][r.method == 'assisted']) for r in planned_rows()]
+    result = summarise(rows)['comparison']
+    assert result['manual_seconds']['median'] == 82.5 and result['assisted_seconds']['median'] == 7
+    assert result['difference_of_medians_seconds'] == 75.5
+    assert result['median_paired_difference_seconds'] == 74  # sorted differences 52, 69, 72, 76, 80, 86

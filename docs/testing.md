@@ -23,7 +23,10 @@ on a temporary copy of the fictional dataset, so `runtime/ar.sqlite` is never to
 - **Evaluation.** Scoring, keeping failed calls separate from rule detections, retries,
   checkpoints and resume.
 - **App pages.** The review, payment, download and timing flows, driven through Streamlit's
-  `AppTest`. `AppTest` can't open a file chooser, so uploads are passed in directly.
+  `AppTest`. This includes a full twelve-task measured timing run with a fake clock and mocked
+  extraction, which checks that the page produces a valid matched comparison. These are software
+  tests, not timing measurements. `AppTest` can't open a file chooser, so uploads are passed in
+  directly.
 - **Excel fixture.** The Python ageing rules against the hand-worked answer in `excel/fixture/`.
 - **Office Script and send journal.** `tests/notification_safeguards.mjs`, run through Node.
   These test local code that isn't installed in the live flow (see [microsoft365.md](microsoft365.md)).
@@ -45,7 +48,8 @@ and 37 aged-debt rows. It also writes a contact sheet of sample PDFs to `tmp/qa/
 
 ## Not covered by automated tests
 
-- Opening the exports in Excel and running the Power Query. This was done by hand; see
-  [excel/README.md](../excel/README.md).
-- Anything in Microsoft 365.
+- Opening the exports in Excel and running the Power Query. The author checked this manually on
+  10 October 2026; see [excel/README.md](../excel/README.md).
+- Anything in Microsoft 365. The author ran the flow once by hand on 10 October 2026; see
+  [microsoft365.md](microsoft365.md).
 - Real file-chooser uploads and downloads in a browser.

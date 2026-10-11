@@ -98,16 +98,17 @@ each document came from ("offline fixtures" or "Ollama (qwen3:8b)").
 - The **posted receivables register** is the same document register on its own.
 - [`excel/aged_debt.pq`](excel/aged_debt.pq) is a Power Query that rebuilds the aged-debt table
   inside Excel from the exported tables, so the buckets can be checked, or recalculated for a
-  new date, without Python. See [excel/README.md](excel/README.md) for the hand-built test
-  fixture and the steps.
+  new date, without Python. I checked it in Excel against a hand-built fixture on 10 October
+  2026. It matched the Python output with no differences. See [excel/README.md](excel/README.md).
 
 ## Microsoft 365
 
 Outside the app, a manually triggered Power Automate flow reads the `AgedDebt` table from an
-exported workbook in OneDrive and emails the overdue rows to the flow owner. It was run once,
-successfully, on 10 October 2026. It has no schedule, no check that the workbook is current,
-and no protection against sending the same email twice. [docs/microsoft365.md](docs/microsoft365.md)
-describes exactly what was built and what wasn't.
+exported workbook in OneDrive and emails the overdue rows to the flow owner. I ran it manually on
+10 October 2026, and it completed and sent the test email to me. It only runs when triggered by
+hand. There's no schedule, no check that the workbook is current, and no protection against
+sending the same email twice, and it reads at most 256 rows because pagination is off.
+[docs/microsoft365.md](docs/microsoft365.md) describes exactly what was built and what wasn't.
 
 ## Evaluation
 
@@ -234,5 +235,4 @@ More detail: [Ollama settings and limits](docs/ollama.md), [testing](docs/testin
 Local-only and ignored by Git: `.env`, `data/`, `runtime/` (review database, timing data),
 `reports/` (raw evaluation reports), `output/` and `tmp/`.
 
-AI coding assistants, including Codex, GitHub Copilot and Claude Code, wrote much of the code,
-tests and documentation in this repository.
+Developed with implementation and review assistance from Codex and Claude Code.

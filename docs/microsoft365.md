@@ -44,13 +44,16 @@ Step 4 columns:
 The subject is `AR Copilot: overdue receivables at 2026-10-10`. The body is one line of text
 saying the data is fictional, followed by the HTML table.
 
-## What was tested (10 October 2026)
+## Manual test (10 October 2026)
+
+The project author ran this test in their own account. It isn't automated, and nobody else has
+repeated it.
 
 | Check | Result |
 | --- | --- |
 | Recipient | Code view showed one To address, the owner's own, and no CC or BCC |
 | Run | One manual run. All five steps succeeded, and Send an email returned HTTP 200 |
-| Email | One message in the owner's mailbox with the subject above. It rendered as an intro line and a table with one row: Cedar Automotive Ltd, NC-0003, 11/05/2026, 5,218.20, 152, 91+ |
+| Email | Received by the author with the subject above. It rendered as an intro line and a table with one row: Cedar Automotive Ltd, NC-0003, 11/05/2026, 5,218.20, 152, 91+ |
 | Schedule | None. The trigger is manual |
 
 NC-0003 appeared at its full value because that workbook was exported before the demo payment
@@ -67,8 +70,6 @@ Two things learned along the way:
 - Create HTML table has no borders or padding, so the columns sit close together. It's readable,
   but styling it hasn't been tried.
 
-All of the above is from the owner's notes on the day. It was not re-checked in the account
-while writing this page.
 
 ## What the flow does not do
 

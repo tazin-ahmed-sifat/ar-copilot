@@ -1,6 +1,9 @@
-# Collecting manual versus Ollama-assisted timings
+# Timing study procedure
 
-This procedure measures actual human entry/review time. The saved extraction evaluation is not a timing study and does not support a time-savings claim. Ollama is the sole real LLM provider, using qwen3:8b at http://127.0.0.1:11434; fixture replay is separate practice only.
+The extraction evaluation measures how long the model takes, not how long a person takes. To
+say anything about time saved, someone has to enter documents by hand and with model
+assistance, under the same conditions. The **Time a document** page supports that. **No timings
+have been collected yet**, so the project currently makes no time-saving claim.
 
 ## Preparation
 
@@ -8,49 +11,62 @@ This procedure measures actual human entry/review time. The saved extraction eva
 .\.venv\Scripts\python.exe scripts\prepare_timing_documents.py
 ```
 
-This creates a separate synthetic corpus under ignored runtime/timing_data/. It does not create observations, call Ollama or change the review database. Keep the corpus unseen by measured participants, and do not publish raw timing CSVs or operator aliases. Use one browser tab per participant.
+This generates a separate fictional set of documents in `runtime/timing_data/`. It doesn't call
+Ollama, record anything or touch the review database. Participants shouldn't see these
+documents before they are timed. Make sure Ollama is running, because assisted tasks always use
+real extraction.
 
-Check that Ollama and qwen3:8b are running before live practice. No key or cloud quota is needed. Measured tasks use Ollama automatically; there is no provider selection or cloud fallback. The timer includes extraction wait, reading, review, correction and final submission.
+## Running a session
 
-## Collection
+1. Open **Time a document**. Enter an operator alias and a study code, and pick order group A or
+   B. Keep the same group for the whole study.
+2. Do a few practice tasks with **Practice run (excluded from results)** ticked. Practice uses
+   NC-0001 to NC-0003. Assisted practice uses Ollama unless **Replay offline demo fixtures for
+   practice** is ticked.
+3. Untick practice and confirm the participant hasn't seen the measured documents. The page
+   then works through a fixed plan of twelve tasks.
+4. **Start next document** starts the clock. A manual task means typing all twelve fields from
+   the PDF. An assisted task means checking the model's fields against the PDF and fixing any
+   mistakes. The clock includes waiting for the model.
+5. **Finish document** stops the clock. Entries are scored against the printed values only after
+   submission, and the participant never sees the ground truth.
+6. If extraction fails, either finish the task by hand or choose **Record incomplete attempt**.
+   Failed attempts stay in the data and are never replaced with a later successful try.
+7. If a session is lost part-way, the page asks for the unfinished attempt to be recorded as
+   interrupted before it lets you continue. Its duration is recorded as unknown, not zero.
 
-1. Open **Time a document**, enter an operator alias and study code, and select order group A or B. Keep that group throughout the study.
-2. Start with **Practice run** enabled. Choose manual or assisted practice. Assisted practice defaults to actual Ollama extraction; **Replay offline demo fixtures for practice** explicitly selects fixture replay. All practice is excluded from measured comparisons.
-3. Disable practice only for unseen measured documents. Confirm no prior exposure. The app follows the fixed 12-task counterbalanced plan below.
-4. Press **Start next document**. Manual tasks require entry from the PDF. Ollama-assisted tasks require checking all twelve returned fields against the PDF, correcting errors and resolving the appropriate accept/reject decision.
-5. Press **Finish document** when review and entry are complete. The app scores exact printed strings and decision accuracy after submission; ground-truth values are not displayed to the participant or passed to the model.
-6. On extraction failure, either finish manually within the assisted attempt or select **Record incomplete attempt**. Failures and elapsed wait stay recorded. Do not silently substitute a successful repeat. Local model/server failure does not disable Microsoft 365 automation.
-7. If a session is lost, record the unfinished attempt as interrupted. Its duration is unknown, not zero. Preserve raw attempt events in runtime/timings.csv.
+Raw attempts go to `runtime/timings.csv`, which is not committed.
 
-## Counterbalanced plan
+## The plan
 
-Each participant completes six manual and six assisted tasks, matched by layout with different invoices. Practice uses NC-0001 to NC-0003 and is excluded from the measured plan.
+Each participant does six manual and six assisted tasks. Each pair uses two different invoices
+with the same layout, and the method that goes first alternates.
 
-| Pair | Layout | Group A manual / Ollama document | Group A first method | Group B first method |
+| Pair | Layout | Group A: manual / assisted | Group A goes first with | Group B goes first with |
 | --- | --- | --- | --- | --- |
-| 1 | 1 | NC-0010 / NC-0013 | Manual | Ollama |
-| 2 | 2 | NC-0011 / NC-0014 | Ollama | Manual |
-| 3 | 3 | NC-0012 / NC-0015 | Manual | Ollama |
-| 4 | 1 | NC-0016 / NC-0019 | Ollama | Manual |
-| 5 | 2 | NC-0017 / NC-0020 | Manual | Ollama |
-| 6 | 3 | NC-0018 / NC-0021 | Ollama | Manual |
+| 1 | 1 | NC-0010 / NC-0013 | Manual | Assisted |
+| 2 | 2 | NC-0011 / NC-0014 | Assisted | Manual |
+| 3 | 3 | NC-0012 / NC-0015 | Manual | Assisted |
+| 4 | 1 | NC-0016 / NC-0019 | Assisted | Manual |
+| 5 | 2 | NC-0017 / NC-0020 | Manual | Assisted |
+| 6 | 3 | NC-0018 / NC-0021 | Assisted | Manual |
 
-Group B swaps the manual/assisted document assignment as well as first method. No document is repeated within a participant's study. The app refuses known prior exposure. Record interruptions and fallback choices; incomplete/unresolved attempts remain in counts.
+Group B swaps which invoice in each pair is manual and which is assisted.
 
-## Analysis and privacy
+## Summarising
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\summarize_timings.py
 ```
 
-The script writes aggregate summaries locally only when measurements exist and no attempt remains unresolved. Keep manual/none, assisted/ollama and assisted/demo groups separate. Historical extraction-mode rows remain locally readable and descriptive; they are excluded from the current Ollama comparison. Different corpus/model sets must be analysed separately. No historical row is relabelled or migrated automatically.
-
-A percentage comparison requires all twelve planned tasks per participant, valid cohort/corpus metadata and matched completed pairs. Incomplete pairs are excluded from medians but retained in counts. The formula is:
+This writes `results/timing_summary.json` and `.md`. It refuses to run while there are no
+measurements or while any attempt is still unresolved. Medians use completed matched pairs only.
+Incomplete attempts are still counted and shown. The headline figure is
 
 ```text
-100 * (median manual seconds - median Ollama-assisted seconds) / median manual seconds
+100 × (median manual seconds − median assisted seconds) / median manual seconds
 ```
 
-Negative values mean assisted entry was slower. Report field errors, decision errors, corrections, runtime failures, completion rates and incomplete attempts alongside speed. Different invoices matched by layout form a synthetic pilot, not a causal experiment; completion bias remains. Only actually measured human timings may support a labelled Ollama-assisted timing result.
-
-Internet access for optional OneDrive/Power Automate/email remains independent of this timing study. See [Microsoft 365 workflow](microsoft365_onedrive.md).
+A negative value means assisted entry was slower. Report it alongside field errors, corrections,
+failures and completion rates. With a handful of participants and synthetic documents, this
+would be a small pilot, not a controlled experiment.

@@ -1,97 +1,238 @@
 # AR Copilot
 
-AR Copilot reads invoice PDFs, requires human review, keeps a SQLite audit history and exports receivables to Excel. Its architecture is **local LLM extraction with optional online Microsoft 365 automation**.
+A student prototype for the data-entry side of accounts receivable. It reads invoice PDFs with a
+local language model, checks the extracted fields against accounting rules, makes a person
+approve every document, and turns the approved documents into an aged-debt report and Excel
+workbooks.
 
-The sole real LLM is the installed Ollama **qwen3:8b**, accessed only at **http://127.0.0.1:11434**. Invoice text never goes to a cloud LLM. Offline demo mode explicitly replays generated fixtures; it does not perform LLM inference. The application has no global offline switch, so intended online integrations remain available separately.
+All data in the repository is fictional. The supplier is "Northbridge Auto Components Ltd" and
+the five customers are made up.
+
+![Review queue showing a document extracted by qwen3:8b with a missing PO number flagged](docs/images/review-queue.png)
+
+## The problem
+
+An accounts receivable team keys invoices and credit notes into a ledger, matches payments to
+them, and chases whatever is overdue. Typing twelve fields from each PDF is slow, and a wrong
+total or date carries straight through to the aged-debt report that decides who gets chased.
+
+A language model can pull the fields out of a PDF quickly, but it can also be confidently wrong.
+So in this app the model only fills in a draft. Deterministic rules check that draft, and a
+reviewer compares it with the PDF before anything reaches the register.
 
 ## What it does
 
-- Extracts twelve invoice/credit-note fields from PDF text using a required-field JSON schema and independent strict validation.
-- Treats document text as untrusted data; rejects oversized inputs without truncating and routes malformed output, timeouts and unavailable models to review.
-- Reuses Decimal accounting checks, duplicate prevention, review/approval, SQLite audit history, payments, linked credit notes and ageing.
-- Exports local Excel registers and aged-debt workbooks for the separate Microsoft 365 workflow.
-- Records manual versus Ollama-assisted timings only when a person actually performs the timed tasks.
+The app is a Streamlit site with three pages.
+
+- **Review queue.** Shows the PDF next to its twelve extracted fields: document type, supplier,
+  customer, document number, invoice and due dates, PO number, currency, net, VAT, total and
+  linked invoice. Failed checks are listed in plain language. The reviewer can correct fields,
+  then approve, save or reject with their name and a reason. Every decision goes into a history
+  table, and approved documents are locked.
+- **Aged debt.** For a chosen reporting date, works out each approved invoice's balance after
+  payments and credit notes, and puts it in a bucket: current, 1–30, 31–60, 61–90 or 91+ days
+  overdue. It shows totals, a chart by customer, the invoice list, and anything left out
+  (unapproved documents and payments with no matching invoice). Two workbooks can be downloaded
+  from here.
+- **Time a document.** A form for running a manual-versus-assisted timing study. No timings have
+  been recorded yet (see [Limitations](#limitations)).
+
+The sidebar loads the 40 demo documents, uploads PDFs for extraction, and imports a payment
+ledger CSV.
+
+![Aged debt page with totals, a stacked bar chart by customer and the invoice table](docs/images/aged-debt.png)
+
+## How extraction, validation and review fit together
 
 ```mermaid
 flowchart LR
-    PDF[Text PDF] --> TEXT[Extracted text]
-    TEXT --> OLLAMA[Loopback Ollama qwen3:8b]
-    DEMO[Explicit demo fixtures] --> REVIEW[Validation and human review]
-    OLLAMA --> REVIEW
-    REVIEW --> DB[SQLite audit history]
-    DB --> EXCEL[Local Excel exports]
-    EXCEL --> M365[Optional online OneDrive and Power Automate]
+    PDF[PDF] --> TEXT[pypdf text]
+    TEXT --> LLM[Ollama qwen3:8b on 127.0.0.1]
+    TEXT -.demo mode.-> FIX[Stored fixture answers]
+    LLM --> RULES[Validation rules]
+    FIX --> RULES
+    RULES --> REVIEW[Human review]
+    REVIEW --> DB[(SQLite)]
+    DB --> AGED[Aged debt]
+    AGED --> XLSX[Excel workbooks]
 ```
 
-## Setup and launch on Windows
+1. **Text.** `pypdf` pulls the text layer out of the PDF. Scanned PDFs have no text layer and
+   are rejected, because there is no OCR.
+2. **Extraction.** The text goes to Ollama's `/api/chat` endpoint with a JSON schema that requires
+   all twelve fields as strings or null. The model is `qwen3:8b`. Temperature is 0, the seed is
+   fixed and thinking is off. The document is sent as data in the user message and the
+   instructions go in the system message. The output is parsed with strict Pydantic validation:
+   extra keys, missing keys and numbers in place of strings are all rejected.
+3. **Rules.** [`ar_copilot/core.py`](ar_copilot/core.py) checks the fields. Required fields must
+   be present: a PO for invoices, a linked invoice for credit notes. The supplier, customer and
+   currency must be known values. Dates must parse, and the due date can't come before the
+   invoice date. Amounts must have at most two decimals, net plus VAT must equal the total, VAT
+   must be 20%, and credit notes must be negative.
+4. **Review.** Every document lands in the queue, whether extraction worked or not. If it failed,
+   the reason is shown and the reviewer types the fields in from the PDF. A document can only be
+   approved once all rules pass.
 
-Ollama and qwen3:8b must already be installed and available. Dependencies can be installed using:
+Extraction never approves anything. The model's output and the reviewer's corrections are stored
+separately, so you can always see what the model actually returned.
+
+**Demo mode** is not model extraction. The 40 generated PDFs come with stored answers, and
+**Load 40 offline demo documents** (or the "Replay offline demo fixtures" checkbox) replays those
+answers so the rest of the app can be tried without Ollama. The review page shows which source
+each document came from ("offline fixtures" or "Ollama (qwen3:8b)").
+
+## Accounting and Excel
+
+- Money is handled as `Decimal` all the way to the spreadsheet, so there is no floating-point drift.
+- Duplicates are blocked twice: the same PDF file can't be added twice (SHA-256), and two
+  approved documents can't share supplier, customer, type and document number.
+- A credit note can only be approved against an approved invoice for the same customer, and it
+  can't be dated before that invoice.
+- Ageing counts only approved documents dated on or before the reporting date. Payments count
+  when they match the invoice number and customer and are dated on or before that date. An
+  invoice due on the reporting date is current. Overpayments are kept as negative balances
+  rather than hidden.
+- The **aged-debt workbook** contains real Excel tables (`PostedReceivables`, `AgedDebt`,
+  `Payments`), a `ReportingDate` named cell, and a Summary sheet whose totals are `SUMIF`
+  formulas over `AgedDebt`. Text cells are written so they can't be interpreted as formulas.
+- The **posted receivables register** is the same document register on its own.
+- [`excel/aged_debt.pq`](excel/aged_debt.pq) is a Power Query that rebuilds the aged-debt table
+  inside Excel from the exported tables, so the buckets can be checked, or recalculated for a
+  new date, without Python. See [excel/README.md](excel/README.md) for the hand-built test
+  fixture and the steps.
+
+## Microsoft 365
+
+Outside the app, a manually triggered Power Automate flow reads the `AgedDebt` table from an
+exported workbook in OneDrive and emails the overdue rows to the flow owner. It was run once,
+successfully, on 10 October 2026. It has no schedule, no check that the workbook is current,
+and no protection against sending the same email twice. [docs/microsoft365.md](docs/microsoft365.md)
+describes exactly what was built and what wasn't.
+
+## Evaluation
+
+The extraction was scored against the 40 generated documents. There were 39 invoices and one
+credit note across three layouts, and two of the documents had deliberate problems: a missing PO
+number and a total that doesn't add up. Each of the twelve fields was compared with the printed
+value as an exact string match. The run used qwen3:8b on the local machine, one attempt per
+document, with no retries.
+
+| Result | Value |
+| --- | ---: |
+| Documents completed | 40/40 |
+| Fields correct | 480/480 |
+| Documents with every field correct | 40/40 |
+| Deliberate anomalies caught by the rules | 2/2 |
+| Rule false positives | 0 |
+| Runtime failures | 0 |
+| Credit note (including linked invoice) correct | 1/1 |
+| Median time per document | 2.12 s |
+| Total model request time | 104.99 s |
+
+Source: [results/ollama_summary.md](results/ollama_summary.md), generated by
+[`scripts/publish_results.py`](scripts/publish_results.py) from the raw run report (run
+`20261010T222850367164Z`). The raw report holds invoice text and model output, so it stays local
+and is not committed.
+
+How to read this:
+
+- It is a **small synthetic dataset**: 40 documents from one generator, three clean digital
+  layouts, one supplier and five customers. The prompt was written with these layouts in view.
+  A perfect score here says the pipeline works on tidy, predictable PDFs. It says nothing about
+  accuracy on real invoices.
+- **Processing time is not time saved.** 104.99 seconds is how long the model took to respond.
+  It doesn't include anyone reading or checking the results. No human timing has been measured.
+- Demo mode would also score 100%, because its answers come from the ground truth. That only
+  shows the scoring code is wired up, and it is never reported as model accuracy.
+
+Commands for re-running or resuming the evaluation are in [docs/evaluation.md](docs/evaluation.md).
+
+## Install and run (Windows)
+
+You need Python 3.12 and [Ollama](https://ollama.com) with the model pulled:
 
 ```powershell
+ollama pull qwen3:8b
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
 ```
 
-The app needs no LLM API key. Optional `.env` settings are in [.env.example](.env.example); the endpoint and model are enforced. Start from this repository:
-
-```powershell
-.\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --browser.gatherUsageStats false
-```
-
-Open http://127.0.0.1:8501. Upload PDFs for Ollama extraction, inspect every field and resolve any validation failures before approval. Approval is a local register action, not an accounting-system posting. Keep existing `runtime/ar.sqlite` to retain decisions and history.
-
-For the fictional fixture demo, generate documents only if the dataset is missing:
+The 40 demo PDFs and the payment ledger are generated into `data/`, which is not committed:
 
 ```powershell
 .\.venv\Scripts\python.exe -m ar_copilot.generate
 ```
 
-Use **Load 40 offline demo documents** or explicitly enable demo fixture replay for uploads. Fixture replay only accepts exact generated PDFs. Internet may be disconnected manually after dependencies and the model are installed: the local app can still extract, review and export. Online Microsoft 365 automation requires internet access. Network isolation has not been verified.
-
-## Saved synthetic-dataset evaluation
-
-The committed [safe Ollama summary](results/ollama_summary.md), regenerated from the saved raw report, supports:
-
-| Metric | Result |
-| --- | ---: |
-| Completed documents | 40/40 |
-| Correct fields | 480/480 |
-| Correct documents | 40/40 |
-| Intentional anomalies detected | 2/2 |
-| Rule false positives | 0 |
-| Runtime failures | 0 |
-| Extraction processing | 104.99 seconds |
-
-These are **synthetic-dataset results**, not real-invoice accuracy or human time savings. The missing PO, inconsistent totals and linked credit note are included. Failures count as wrong in overall accuracy; completed-document accuracy is reported separately. Raw responses and extracted values remain under ignored `reports/ollama/`. Historical raw reports are retained locally, and existing Git history is preserved.
-
-For a new corpus/run, first run the three-layout check; then run the sequential checkpoint evaluator:
+Start the app with Ollama running:
 
 ```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode ollama --sample per-layout
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode ollama --sample full --resilient --pace 0 --max-attempts 1
+.\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --browser.gatherUsageStats false
 ```
 
-Resume the existing completed report without repeating successful inference calls:
+Then open http://127.0.0.1:8501. A quick tour:
+
+1. Click **Load 40 offline demo documents**, then import `data/payments.csv` under Payments.
+2. In the review queue, approve the documents that pass. NC-0006 and NC-0009 should fail their
+   checks.
+3. Open **Aged debt** and download a workbook.
+4. To try real extraction, upload a text-based PDF with the fixture checkbox off. A PDF that is
+   already in the queue is skipped as a duplicate.
+
+Decisions are kept in `runtime/ar.sqlite`. Delete that file to start again, and keep it if you
+want to keep your review history. No API key is needed. `.env` is optional, and
+[.env.example](.env.example) shows the only two settings. The app only accepts
+`http://127.0.0.1:11434` and `qwen3:8b`, and won't start an extraction with anything else.
+
+Tests (offline, using mocked Ollama responses and temporary copies of the data):
 
 ```powershell
-.\.venv\Scripts\python.exe -m ar_copilot.evaluate --mode ollama --sample full --resilient --pace 0 --max-attempts 1 --resume .\reports\ollama\resilient_20261010T222850202032Z.json
-```
-
-For an interrupted run, substitute its printed checkpoint path. Regenerate the safe summary locally:
-
-```powershell
-.\.venv\Scripts\python.exe scripts\publish_results.py .\reports\ollama\resilient_20261010T222850202032Z.json
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-## Documentation
+More detail: [Ollama settings and limits](docs/ollama.md), [testing](docs/testing.md),
+[timing study procedure](docs/timing_procedure.md).
 
-- [Ollama settings, context limits and offline operation](docs/ollama_setup.md)
-- [Evaluation checkpoints and resume](docs/retry_resume.md)
-- [Local QA](docs/local_testing.md) and [timing procedure](docs/timing_procedure.md)
-- [Excel workflow and fixture](excel/README.md)
-- [Separate OneDrive/Power Automate/email workflow](docs/microsoft365_onedrive.md)
-- [Proposed SharePoint/Teams extension](docs/microsoft365.md)
-- [Release review](docs/release_review.md) and [public repository contents](docs/public_repository.md)
+## Design decisions
 
-Scanned PDFs need OCR, which is not implemented. Conservative context checks may reject text that would fit with exact tokenization. Human review is mandatory. Microsoft 365 configuration, delivery safeguards and any real human timing study remain separate manual work.
+- **Local model only.** Invoice text is sent to Ollama on the loopback address and nowhere else.
+  The HTTP client ignores proxy settings and refuses redirects. The app asks Ollama for the
+  model's details first and refuses cloud-backed models. If Ollama isn't available, the document
+  goes to review with an error, and there is no fallback to a cloud API. An earlier version
+  called a hosted model. It was removed so that document text never leaves the machine.
+- **Reject rather than truncate.** The context window is set to 4,096 tokens. Before sending,
+  the app estimates the size of the request from its UTF-8 byte count, which is deliberately
+  pessimistic. A document that might not fit is sent to manual review instead of being cut short.
+  Responses that hit the output limit are rejected as well.
+- **Rules are separate from the model.** The checks are ordinary Python, so they behave the same
+  whether a field came from the model, from a fixture or from a person.
+- **Approval is local.** "Approve" means approved in this app's register. Nothing is posted to a
+  real accounting system.
+
+## Limitations
+
+- No OCR, so scanned invoices can't be extracted.
+- The rules are built for the fictional dataset: one supplier, a fixed customer list, GBP only
+  and 20% VAT.
+- Accuracy on real invoices is unknown.
+- No human timing study has been run, so there is no evidence of time saved. The timing page
+  and [procedure](docs/timing_procedure.md) are ready, but no measurements exist.
+- Single user. There are no logins, and the reviewer name is free text.
+- The size check can turn away documents that would actually have fitted.
+- The Microsoft 365 flow is manual and has none of the safeguards a scheduled job would need.
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `app.py`, `views/` | Streamlit app and its three pages |
+| `ar_copilot/` | Extraction, Ollama client, rules, storage, export, evaluation, timing, data generator |
+| `excel/` | Power Query files, the hand-checked fixture, and an unused Office Script (see the Microsoft 365 doc) |
+| `scripts/` | Summary publishing, local end-to-end check, fixture builder, timing helpers, file audit |
+| `results/` | Metrics-only evaluation summary |
+| `tests/` | pytest suite (and Node tests for the Office Script and journal helper) |
+
+Local-only and ignored by Git: `.env`, `data/`, `runtime/` (review database, timing data),
+`reports/` (raw evaluation reports), `output/` and `tmp/`.
+
+AI coding assistants, including Codex, GitHub Copilot and Claude Code, wrote much of the code,
+tests and documentation in this repository.
